@@ -38,8 +38,25 @@ type Cert struct {
 // Peer is another agent this one talks to.
 type Peer struct {
 	Name string `yaml:"name"`
-	URL  string `yaml:"url"`
+	URL  string `yaml:"url"`  // https://<host>[:port], the peer's public URL
+	Env  string `yaml:"env"`  // key into environments; empty = "prod"
+	Dial string `yaml:"dial"` // optional host:port to connect to instead (local runs)
 }
+
+// Environment is one ANS deployment: production, or a local reference stack.
+// One peer list may mix environments.
+type Environment struct {
+	RegistryURL  string   `yaml:"registry_url"`
+	LogURL       string   `yaml:"log_url"`        // where the transparency log is reached
+	LogPublicURL string   `yaml:"log_public_url"` // what badges advertise, if different (local TL is plain HTTP)
+	FinderURL    string   `yaml:"finder_url"`     // ANS Finder base (.../v1); empty = no tag search
+	DNSServer    string   `yaml:"dns_server"`     // host:port for badge/TLSA lookups; empty = system
+	RootKeys     []string `yaml:"root_keys"`      // C2SP strings from the log's /root-keys
+	InsecureHTTP bool     `yaml:"insecure_http"`  // allow http:// URLs (local stack only)
+}
+
+// ProdEnv is the environment name used when a peer names none.
+const ProdEnv = "prod"
 
 // Identity holds paths to the ANS identity key (EC P-256, PEM) and its
 // certificate chain (PEM, leaf first). Empty means a throwaway local identity.
@@ -70,6 +87,7 @@ type Card struct {
 	TLAgentURL  string  `yaml:"tl_agent_url"` // transparency log URL for this agent
 	DNSAID      bool    `yaml:"dns_aid"`      // set only once the SVCB record exists
 	Tier2       *bool   `yaml:"tier2"`        // default true
+	SignedFile  string  `yaml:"signed_file"`  // persist the signed card here so its bytes (and metaDataHash) survive restarts
 	Skills      []Skill `yaml:"skills"`
 }
 
@@ -78,17 +96,18 @@ func (c Card) Tier2On() bool { return c.Tier2 == nil || *c.Tier2 }
 
 // Config is one agent's configuration.
 type Config struct {
-	Role        string   `yaml:"role"`
-	Host        string   `yaml:"host"`
-	Port        int      `yaml:"port"`
-	PublicURL   string   `yaml:"public_url"`
-	Cert        Cert     `yaml:"cert"`
-	Identity    Identity `yaml:"identity"`
-	Card        Card     `yaml:"card"`
-	Peers       []Peer   `yaml:"peers"`
-	TrustRoots  []string `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
-	RegistryURL string   `yaml:"registry_url"`
-	LogURL      string   `yaml:"log_url"`
+	Role         string                 `yaml:"role"`
+	Host         string                 `yaml:"host"`
+	Port         int                    `yaml:"port"`
+	PublicURL    string                 `yaml:"public_url"`
+	Cert         Cert                   `yaml:"cert"`
+	Identity     Identity               `yaml:"identity"`
+	Card         Card                   `yaml:"card"`
+	Peers        []Peer                 `yaml:"peers"`
+	Environments map[string]Environment `yaml:"environments"`
+	TrustRoots   []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
+	RegistryURL  string                 `yaml:"registry_url"`
+	LogURL       string                 `yaml:"log_url"`
 }
 
 // Load reads path, applies env overrides and defaults, and validates.
@@ -178,6 +197,12 @@ func (c *Config) ApplyDefaults() {
 	if c.Card.DisplayName == "" {
 		c.Card.DisplayName = c.Host
 	}
+	if c.Environments == nil {
+		c.Environments = map[string]Environment{}
+	}
+	if _, ok := c.Environments[ProdEnv]; !ok {
+		c.Environments[ProdEnv] = Environment{RegistryURL: c.RegistryURL, LogURL: c.LogURL, RootKeys: c.TrustRoots}
+	}
 }
 
 // Validate reports the first invalid field as a bad_request error.
@@ -212,6 +237,11 @@ func (c Config) Validate() error {
 			return err
 		}
 	}
+	for name, e := range c.Environments {
+		if err := e.validate(name); err != nil {
+			return err
+		}
+	}
 	for _, p := range c.Peers {
 		if p.Name == "" {
 			return errs.New(errs.BadRequest, "peer name is empty")
@@ -219,8 +249,34 @@ func (c Config) Validate() error {
 		if err := checkHTTPSURL(p.URL); err != nil {
 			return err
 		}
+		if _, ok := c.Environments[p.EnvName()]; !ok && len(c.Environments) > 0 {
+			return errs.New(errs.BadRequest, fmt.Sprintf("peer %s names unknown environment %q", p.Name, p.Env))
+		}
 	}
 	return nil
+}
+
+// EnvName returns the peer's environment, defaulting to prod.
+func (p Peer) EnvName() string {
+	if p.Env == "" {
+		return ProdEnv
+	}
+	return p.Env
+}
+
+func (e Environment) validate(name string) error {
+	check := func(field, u string, required bool) error {
+		if u == "" && !required {
+			return nil
+		}
+		parsed, err := url.Parse(u)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && !(e.InsecureHTTP && parsed.Scheme == "http")) {
+			return errs.New(errs.BadRequest, fmt.Sprintf("environment %s: %s %q must be an https URL (http only with insecure_http)", name, field, u))
+		}
+		return nil
+	}
+	return errors.Join(check("registry_url", e.RegistryURL, true), check("log_url", e.LogURL, true),
+		check("log_public_url", e.LogPublicURL, false), check("finder_url", e.FinderURL, false))
 }
 
 // semver accepts N.N.N with decimal numbers (the ANS name embeds it).

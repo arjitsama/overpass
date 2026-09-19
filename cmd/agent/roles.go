@@ -28,7 +28,7 @@ func securityFor(ctx context.Context, cfg config.Config, log *slog.Logger) (a2a.
 	if cfg.Role != "station" && cfg.Role != "authority" {
 		return sec, nil
 	}
-	keys, err := scitt.NewKeyStore(cfg.TrustRoots)
+	keys, err := scitt.NewKeyStore(rootKeys(cfg))
 	if err != nil {
 		return sec, fmt.Errorf("trust_roots: %w", err)
 	}
@@ -47,6 +47,27 @@ func securityFor(ctx context.Context, cfg config.Config, log *slog.Logger) (a2a.
 		sec.Skill["book_pass"] = []a2a.SkillGuard{a2a.MandateGuard(func() []*ecdsa.PublicKey { return nil })}
 	}
 	return sec, nil
+}
+
+// rootKeys is every transparency log root key the agent trusts: trust_roots
+// plus each environment's root_keys, deduplicated. Callers may be registered
+// in any configured environment.
+func rootKeys(cfg config.Config) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(ks []string) {
+		for _, k := range ks {
+			if !seen[k] {
+				seen[k] = true
+				out = append(out, k)
+			}
+		}
+	}
+	add(cfg.TrustRoots)
+	for _, e := range cfg.Environments {
+		add(e.RootKeys)
+	}
+	return out
 }
 
 // a2aServer builds the JSON-RPC server for the configured skills. Handlers

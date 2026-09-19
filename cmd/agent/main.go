@@ -16,6 +16,7 @@ import (
 
 	"github.com/arjitsama/overpass/internal/config"
 	"github.com/arjitsama/overpass/internal/errs"
+	"github.com/arjitsama/overpass/internal/wellknown"
 )
 
 func main() {
@@ -33,6 +34,7 @@ func run(ctx context.Context, args []string, logw io.Writer) error {
 	fs.SetOutput(logw)
 	cfgPath := fs.String("config", "", "path to the agent's YAML config (required)")
 	role := fs.String("role", "", "override role: "+strings.Join(config.Roles, "|"))
+	writeCard := fs.String("write-card", "", "write the signed agent card to this path and exit (to compute metaDataHash before registering)")
 	if err := fs.Parse(args); err != nil {
 		return errs.New(errs.BadRequest, err.Error())
 	}
@@ -54,6 +56,10 @@ func run(ctx context.Context, args []string, logw io.Writer) error {
 	a, err := newAgent(cfg, log)
 	if err != nil {
 		return err
+	}
+	if *writeCard != "" {
+		a.stop()
+		return os.WriteFile(*writeCard, a.files[wellknown.PathCard].Body, 0o644)
 	}
 	ln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(cfg.Port)))
 	if err != nil {

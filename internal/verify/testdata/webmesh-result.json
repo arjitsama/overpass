@@ -1,0 +1,71 @@
+{
+  "host": "agent.webmesh.ai",
+  "url": "https://agent.webmesh.ai",
+  "env": "prod",
+  "agent_id": "de02d013-138e-4e50-9cae-daa20bc3dc37",
+  "ans_name": "ans://v1.0.13.agent.webmesh.ai",
+  "token_iat": "2026-09-19T16:52:39-04:00",
+  "checks": [
+    {
+      "name": "registered",
+      "verdict": "pass",
+      "detail": {
+        "agent_id": "de02d013-138e-4e50-9cae-daa20bc3dc37",
+        "ans_name": "ans://v1.0.13.agent.webmesh.ai",
+        "badge_url": "https://transparency.ans.godaddy.com/v1/agents/de02d013-138e-4e50-9cae-daa20bc3dc37"
+      }
+    },
+    {
+      "name": "badge",
+      "verdict": "warn",
+      "reason": "badge status is WARNING",
+      "detail": {
+        "schema": "V1",
+        "status": "WARNING"
+      }
+    },
+    {
+      "name": "scitt_receipt",
+      "verdict": "pass",
+      "detail": {
+        "leaf_index": "209721",
+        "tree_size": "209722"
+      }
+    },
+    {
+      "name": "status_token",
+      "verdict": "fail",
+      "reason": "status token says WARNING",
+      "detail": {
+        "iat": "2026-09-19T20:52:39Z",
+        "status": "WARNING"
+      }
+    },
+    {
+      "name": "cert_chain",
+      "verdict": "fail",
+      "reason": "server certificate is not attested in the status token",
+      "detail": {
+        "attested_server_sha256": "6504d16a980d7da0162e5c3bad81f736e1e7db0a447180de6e5a944f597b7e80",
+        "server_sha256": "a2ec49d0f4e9ded0e9c30fb219a205a0aeecd27f746460bd9a53599bbb8d9332",
+        "subject": "agent.webmesh.ai"
+      }
+    },
+    {
+      "name": "tlsa",
+      "verdict": "skip",
+      "reason": "not run: server certificate not attested"
+    },
+    {
+      "name": "card_hash",
+      "verdict": "skip",
+      "reason": "not run: server certificate not attested"
+    },
+    {
+      "name": "card_signature",
+      "verdict": "skip",
+      "reason": "not run: server certificate not attested"
+    }
+  ],
+  "verdict": "fail"
+}

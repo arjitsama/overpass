@@ -1,0 +1,28 @@
+# Ground station registered on the LOCAL ANS reference stack, serving the
+# RA-issued server and identity certificates written by
+#   scripts/local-register.sh gs-blacksburg.localhost 0.1.0 certs/local/gs-blacksburg
+# (certs/ is gitignored). Used by scripts/accept/phase-3.sh.
+role: station
+host: gs-blacksburg.localhost
+port: 8444
+cert:
+  cert_file: certs/local/gs-blacksburg/server.pem
+  key_file: certs/local/gs-blacksburg/server.key
+identity:
+  key_file: certs/local/gs-blacksburg/identity.key
+  chain_file: certs/local/gs-blacksburg/identity.pem
+card:
+  version: 0.1.0
+  display_name: Ground Station Blacksburg
+  description: UHF ground station registered on the local ANS stack.
+  org_name: Overpass
+  skills:
+    - id: get_pass_quote
+      name: Pass quote
+      description: Prices a pass for a NORAD ID, AOS, LOS and mode, in integer cents.
+      tags: [uplink-uhf, downlink-uhf]
+    - id: book_pass
+      name: Book pass
+      description: Books a quoted pass. Requires an authority-signed mandate and a DPoP proof.
+      tags: [uplink-uhf, downlink-uhf]
+  signed_file: certs/local/gs-blacksburg/agent-card.json

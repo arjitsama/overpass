@@ -69,6 +69,46 @@ registered `metaDataHash`. Cards are served in JCS form, so the raw and JCS hash
 
 Every rejection is JSON `{"code":...,"detail":...}` with a code from `internal/errs`.
 
+## Verification (`internal/verify`)
+
+`Verifier.VerifyPeer(ctx, host)` runs eight checks, emits one bus event per check, and fails closed:
+
+| Check | What passes |
+| --- | --- |
+| `registered` | `_ans-badge` TXT points at this environment's log, and the badge is for this host |
+| `badge` | badge status ACTIVE (WARNING or DEPRECATED is a warning) |
+| `scitt_receipt` | the receipt verifies against the log's root keys |
+| `status_token` | the token verifies, is for this agent and host, and is ACTIVE; a fetch error passes for 10 min on the last good token |
+| `cert_chain` | the server leaf the peer presents is attested in the status token and covers the host |
+| `tlsa` | DANE `_443._tcp` matches (no record is a warning) |
+| `card_hash` | the served card's SHA-256 equals the registered `metaDataHash` |
+| `card_signature` | the card verifies with the trust-card key at a pinned `jku`, and its `x5c` leaf is an attested identity cert |
+
+**Other pieces:**
+- `FindByTag` uses the ANS Finder.
+- `Outbound.Attach` signs outbound requests with DPoP and adds SCITT headers.
+- `internal/webmesh` asks agent.webmesh.ai's MCP `verify_agent` tool for its verdict.
+- Environments (production and a local stack) and peers are listed in config under
+  `environments` and `peers[{name,url,env,dial}]`.
+
+## Local ANS stack
+
+```sh
+git clone https://github.com/agentnameservice/ans.git ../ans
+scripts/local-ans.sh start            # RA :18080, log :18081, Finder :18082, DNS :15353
+scripts/local-ans.sh env              # environment block (with root key) for a config
+scripts/local-register.sh gs-blacksburg.localhost 0.1.0 certs/local/gs-blacksburg configs/local/station-ans.yaml
+bin/agent --config configs/local/station-ans.yaml
+scripts/local-ans.sh stop
+```
+
+`scripts/accept/phase-3.sh` does all of this and runs the checks.
+
+**Registering on production is a human step:**
+- `scripts/register.sh <host>` only prints the plan. Each step needs `--step <step>`
+  and `--i-am-a-human-and-this-is-permanent`.
+- `scripts/dns-records.sh` prints the DNS records to create.
+
 ## Layout
 
 `cmd/agent` (the one binary), `cmd/battery` (attack battery, later),

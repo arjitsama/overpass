@@ -396,10 +396,10 @@ func TestTrustCardKeyBinding(t *testing.T) {
 	files, id := build(t, c, stationSecurity())
 	fetch, _ := fetcherFor(files, c.Host)
 	sum := sha256.Sum256(id.Chain[0].Raw)
-	if err := VerifyCard(files[PathCard].Body, Expect{Host: c.Host, LeafSHA256: hex.EncodeToString(sum[:])}, fetch); err != nil {
+	if err := VerifyCard(files[PathCard].Body, Expect{Host: c.Host, LeafSHA256s: []string{"SHA256:" + strings.ToUpper(hex.EncodeToString(sum[:]))}}, fetch); err != nil {
 		t.Fatalf("attested leaf: %v", err)
 	}
-	err := VerifyCard(files[PathCard].Body, Expect{Host: c.Host, LeafSHA256: strings.Repeat("0", 64)}, fetch)
+	err := VerifyCard(files[PathCard].Body, Expect{Host: c.Host, LeafSHA256s: []string{strings.Repeat("0", 64)}}, fetch)
 	if !errs.Is(err, errs.CardRejectedSignature) {
 		t.Fatalf("wrong attested leaf: %v", err)
 	}
@@ -443,5 +443,33 @@ func TestIdentityChainChecks(t *testing.T) {
 		ChainFile: write("chain.pem", "CERTIFICATE", leafDER, stranger.Chain[0].Raw)}, ANSName(c))
 	if err == nil {
 		t.Fatal("unlinked chain accepted")
+	}
+}
+
+// A persisted signed card is reused byte for byte while its payload is
+// unchanged, so the registered metaDataHash survives restarts.
+func TestSignedCardPersists(t *testing.T) {
+	c := stationConfig(t)
+	c.Card.SignedFile = filepath.Join(t.TempDir(), "card.json")
+	id, _ := LoadIdentity(c.Identity, ANSName(c))
+	a, err := Build(Input{Config: c, Identity: id, Security: stationSecurity()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := Build(Input{Config: c, Identity: id, Security: stationSecurity()})
+	if string(a[PathCard].Body) != string(b[PathCard].Body) {
+		t.Fatal("card bytes changed across builds despite signed_file")
+	}
+	c.Card.Description = "changed"
+	d, _ := Build(Input{Config: c, Identity: id, Security: stationSecurity()})
+	if string(d[PathCard].Body) == string(a[PathCard].Body) {
+		t.Fatal("changed card reused the old signature")
+	}
+	other, _ := LoadIdentity(config.Identity{}, ANSName(c))
+	c.Card.Description = stationConfig(t).Card.Description
+	_ = os.WriteFile(c.Card.SignedFile, a[PathCard].Body, 0o644)
+	e, _ := Build(Input{Config: c, Identity: other, Security: stationSecurity()})
+	if string(e[PathCard].Body) == string(a[PathCard].Body) {
+		t.Fatal("card signed by another key was reused")
 	}
 }

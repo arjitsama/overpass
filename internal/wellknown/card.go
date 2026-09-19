@@ -1,6 +1,7 @@
 package wellknown
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	gojose "github.com/go-jose/go-jose/v4"
@@ -109,13 +111,56 @@ func (b builder) card(files Files) error {
 	if err != nil {
 		return err
 	}
+	if saved, ok := b.reuseSigned(payload); ok {
+		files[PathCard] = File{Body: saved, ContentType: "application/json"}
+		return nil
+	}
 	tok, err := jose.SignDetached(jose.TypAgentCard, payload, b.id.Key, b.url(PathTrustCard))
 	if err != nil {
 		return err
 	}
 	parts := strings.Split(tok, "..")
 	card.Signatures = []signature{{Protected: parts[0], Signature: parts[1], Header: map[string]string{"kid": b.kid}}}
-	return putJSON(files, PathCard, card)
+	if err := putJSON(files, PathCard, card); err != nil {
+		return err
+	}
+	if b.c.Card.SignedFile != "" {
+		if err := os.WriteFile(b.c.Card.SignedFile, files[PathCard].Body, 0o644); err != nil {
+			return fmt.Errorf("card signed_file: %w", err)
+		}
+	}
+	return nil
+}
+
+// reuseSigned returns the persisted signed card when its payload equals
+// payload and its signature verifies under this agent's key. ECDSA
+// signatures are randomized, so re-signing would change the card's bytes
+// and break the registered metaDataHash (master plan 5A: freeze cards).
+func (b builder) reuseSigned(payload []byte) ([]byte, bool) {
+	if b.c.Card.SignedFile == "" {
+		return nil, false
+	}
+	raw, err := os.ReadFile(b.c.Card.SignedFile)
+	if err != nil || jose.StrictJSON(raw, schema.MaxObjectBytes) != nil {
+		return nil, false
+	}
+	var card map[string]json.RawMessage
+	var sigs []signature
+	if json.Unmarshal(raw, &card) != nil || json.Unmarshal(card["signatures"], &sigs) != nil || len(sigs) != 1 {
+		return nil, false
+	}
+	delete(card, "signatures")
+	saved, err := jose.Canonicalize(card)
+	if err != nil || !bytes.Equal(saved, payload) {
+		return nil, false
+	}
+	_, err = jose.VerifyDetached(sigs[0].Protected+".."+sigs[0].Signature, payload, schema.CardProfile,
+		[]*ecdsa.PublicKey{&b.id.Key.PublicKey}, nil)
+	if err != nil {
+		return nil, false
+	}
+	canon, err := jose.Transform(raw)
+	return canon, err == nil
 }
 
 func (b builder) unsignedCard() agentCard {
@@ -204,8 +249,8 @@ const maxTrustCardBytes = 64 << 10
 // verified host and, when known, the SHA-256 (hex) of the identity cert the
 // transparency log attests. Phase 3 fills these from the registry and log.
 type Expect struct {
-	Host       string // ANS-verified agentHost (host[:port]); required
-	LeafSHA256 string // attested identity cert fingerprint; empty skips the check
+	Host        string   // ANS-verified agentHost (host[:port]); required
+	LeafSHA256s []string // attested identity cert fingerprints (hex); empty skips the check
 }
 
 // VerifyCard checks a served agent card's signature using only the key found,
@@ -214,7 +259,7 @@ type Expect struct {
 //     exactly https://<host>/.well-known/ans/trust-card.json; anything else is
 //     rejected before a fetch
 //   - each trust-card key must be the public key of its own x5c leaf, and that
-//     leaf must match exp.LeafSHA256 when given
+//     leaf must be one of exp.LeafSHA256s when any are given
 //
 // Returns CARD_* codes and never panics.
 func VerifyCard(raw []byte, exp Expect, fetch TrustFetcher) (err error) {
@@ -252,7 +297,7 @@ func VerifyCard(raw []byte, exp Expect, fetch TrustFetcher) (err error) {
 	if err != nil {
 		return errs.New(errs.CardRejectedJKU, "trust card fetch failed: "+err.Error())
 	}
-	keys, err := trustCardKeys(body, exp.LeafSHA256)
+	keys, err := trustCardKeys(body, sigs[0].Header["kid"], exp.LeafSHA256s)
 	if err != nil {
 		return err
 	}
@@ -270,6 +315,19 @@ func protectedJKU(protected string) (string, error) {
 		return "", errs.New(errs.CardParseError, "protected header has no jku")
 	}
 	return h.JKU, nil
+}
+
+// attestedLeaf reports whether SHA-256(der) is in fps (hex, case-insensitive,
+// optional "SHA256:" prefix as transparency logs write it).
+func attestedLeaf(der []byte, fps []string) bool {
+	sum := sha256.Sum256(der)
+	got := hex.EncodeToString(sum[:])
+	for _, fp := range fps {
+		if strings.EqualFold(strings.TrimPrefix(strings.TrimPrefix(fp, "SHA256:"), "sha256:"), got) {
+			return true
+		}
+	}
+	return false
 }
 
 // pinJKU accepts only https://<trusted host>/.well-known/ans/trust-card.json,
@@ -296,8 +354,8 @@ func pinJKU(jku, cardURL, host string) error {
 }
 
 // trustCardKeys returns the EC P-256 keys of a trust card whose JWK equals
-// its own x5c leaf key (and whose leaf matches leafSHA256, if given).
-func trustCardKeys(body []byte, leafSHA256 string) ([]*ecdsa.PublicKey, error) {
+// its own x5c leaf key (and whose leaf is one of attested, if any are given).
+func trustCardKeys(body []byte, kid string, attested []string) ([]*ecdsa.PublicKey, error) {
 	if err := jose.StrictJSON(body, maxTrustCardBytes); err != nil {
 		return nil, errs.New(errs.CardRejectedJKU, "trust card: "+err.Error())
 	}
@@ -310,7 +368,7 @@ func trustCardKeys(body []byte, leafSHA256 string) ([]*ecdsa.PublicKey, error) {
 	var keys []*ecdsa.PublicKey
 	for _, k := range tc.Keys {
 		var jwk gojose.JSONWebKey
-		if jwk.UnmarshalJSON(k) != nil || len(jwk.Certificates) == 0 {
+		if jwk.UnmarshalJSON(k) != nil || len(jwk.Certificates) == 0 || (kid != "" && jwk.KeyID != kid) {
 			continue
 		}
 		pub, ok := jwk.Key.(*ecdsa.PublicKey)
@@ -318,11 +376,8 @@ func trustCardKeys(body []byte, leafSHA256 string) ([]*ecdsa.PublicKey, error) {
 		if !ok || !lok || !pub.Equal(leaf) {
 			continue
 		}
-		if leafSHA256 != "" {
-			sum := sha256.Sum256(jwk.Certificates[0].Raw)
-			if hex.EncodeToString(sum[:]) != strings.ToLower(leafSHA256) {
-				continue
-			}
+		if len(attested) > 0 && !attestedLeaf(jwk.Certificates[0].Raw, attested) {
+			continue
 		}
 		keys = append(keys, pub)
 	}
