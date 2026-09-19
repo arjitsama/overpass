@@ -1,0 +1,21 @@
+# Registered lookalike: registered on ANS (so it verifies) but not seeded with
+# trust, so the trust index keeps it READ_ONLY and the authority refuses an
+# uplink mandate for it (POLICY_REFUSED:tier). Register on a second local host:
+#   scripts/local-register.sh gs-svalbard-eu.localhost 0.1.0 certs/local/gs-svalbard-eu deploy/local/station-lookalike.yaml
+role: station
+host: gs-svalbard-eu.localhost
+port: 8448
+cert: {cert_file: certs/local/gs-svalbard-eu/server.pem, key_file: certs/local/gs-svalbard-eu/server.key}
+identity: {key_file: certs/local/gs-svalbard-eu/identity.key, chain_file: certs/local/gs-svalbard-eu/identity.pem}
+db_path: data/gs-svalbard-eu.db
+pricing: {per_minute_cents: 60, pay_to: "0xLookalike", network: base-sepolia, asset: USDC, asset_decimals: 6}
+satreg: {file: deploy/local/registry.jws, signer_key_file: deploy/local/authority.pub}
+authority_keys:
+  - {ans_name: ans://v0.1.0.authority.localhost, key_file: deploy/local/authority.pub}
+card:
+  version: 0.1.0
+  display_name: gs-svalbard (lookalike)
+  signed_file: certs/local/gs-svalbard-eu/agent-card.json
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf, downlink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf, downlink-uhf]}

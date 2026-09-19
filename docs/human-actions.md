@@ -66,6 +66,9 @@ Tick an item (`[x]`) when it's done, and note when.
   (Phase 1, 6)
 - [ ] **Local databases are versioned.** After an upgrade that changes the schema, an agent refuses an
   old `data/*.db` with a clear message; delete the file. (Phase 6)
+- [ ] **Canary probing runs from `cmd/battery`, not the auditor agent.** The auditor's `audit_pass`
+  is passive; canary needs booking credentials, which the battery holds. Decide if the auditor agent
+  should own canary for the demo. (Phase 7)
 - [ ] **Skill call shape `{"skill": id, ...args}` in the A2A data part.** supplier.webmesh.ai's exact
   shape wasn't captured. (Phase 2)
 
@@ -111,6 +114,21 @@ Tick an item (`[x]`) when it's done, and note when.
     fetch cuts the session (`SESSION_CUT:revoked`), and Ops replans.
   - Production revocations are permanent. Rehearse on the local stack first, and decide whether
     `REMOVE_FROM_CRL` restores ACTIVE there.
+
+## Set up per deployment (Phase 7)
+
+- [ ] **Adversary profiles** in `deploy/local/`: honest station, `gs-rogue` (rogue+ack), the
+  unregistered impostor `gs-sva1bard`, and the registered lookalike. Register the honest/rogue/
+  lookalike on the reference stack; leave the impostor unregistered.
+- [ ] **Auditor** (`role: auditor`): configure `auditor.station_keys` (each station's identity public
+  key, to verify booking receipts) and `authority_keys`. It mounts `audit_pass`. Add its ANS name to
+  each station's `session.auditors` so it can read evidence.
+- [ ] **Battery credentials** (`deploy/local/battery-*.yaml`): the battery holds two registered Ops
+  identities and the authority signing keys the target station trusts. This is deliberate for a
+  red-team tool. Fill in the `<...>` placeholders (agent ids, root keys) from the local stack.
+- [ ] **Deploy gate:** `bin/battery run -config <cfg>` exits non-zero unless every check is BLOCKED.
+  Wire it into the deploy so a vulnerable station cannot ship. Use `-expect-vulnerable` only for the
+  rogue demo.
 
 ## Before the demo
 

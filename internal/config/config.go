@@ -121,6 +121,12 @@ type SessionCfg struct {
 	Auditors      []string `yaml:"auditors"`       // ANS names that may read any session's evidence
 }
 
+// AuditorCfg configures the auditor role.
+type AuditorCfg struct {
+	StationKeys []AuthorityKey `yaml:"station_keys"` // ans_name -> identity public key (to verify receipts)
+	Env         string         `yaml:"env"`          // environment for VerifyPeer (default prod)
+}
+
 // MaxPerMinuteCents bounds a station's price ($10,000 a minute).
 const MaxPerMinuteCents = 1_000_000
 
@@ -186,6 +192,7 @@ type Config struct {
 	OpsAgents     []string               `yaml:"ops_agents"`  // ANS names allowed to request mandates
 	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier, until Phase 8
 	FlightRules   FlightRules            `yaml:"flight_rules"`
+	Auditor       AuditorCfg             `yaml:"auditor"`
 	Spacecraft    SpacecraftCfg          `yaml:"spacecraft"`
 	Session       SessionCfg             `yaml:"session"`
 	Rogue         bool                   `yaml:"rogue"`

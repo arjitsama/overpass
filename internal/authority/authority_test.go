@@ -173,3 +173,18 @@ func TestHostileArgs(t *testing.T) {
 		}
 	}
 }
+
+// Acceptance 4: the registered lookalike verifies, but an uplink mandate for
+// it is refused with POLICY_REFUSED:tier. Identity is not authorization.
+func TestLookalikeVerifiesButNoUplink(t *testing.T) {
+	f := newFixture(t)
+	// The lookalike passes verification (it is registered) but is READ_ONLY.
+	f.a.Trust.(StaticTrust)["gs-svalbard-eu.example"] = planner.TierReadOnly
+	if res := f.peers.VerifyPeer(context.Background(), "gs-svalbard-eu.example"); !res.OK() {
+		t.Fatal("the lookalike should verify")
+	}
+	_, err := f.issue(f.ctx, quote("gs-svalbard-eu.example", schema.ModeUplink, 1200))
+	if !errs.Is(err, errs.PolicyRefusedTier) {
+		t.Fatalf("uplink for the lookalike: %v", err)
+	}
+}

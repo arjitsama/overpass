@@ -1,0 +1,19 @@
+# Battery config for the honest station. It legitimately holds the authority
+# signing keys the station trusts, to craft validly-signed mandates, plus two
+# registered Ops identities (produced by scripts/local-register.sh).
+station_url: https://gs-rogue.localhost:8445/
+station_ans: ans://v0.1.0.gs-rogue.localhost
+station_host: gs-rogue.localhost
+station_ca: certs/local/gs-rogue/server.pem
+spacecraft_url: https://spacecraft.localhost:8446/
+norad_id: 27844
+other_station: ans://v0.1.0.gs-svalbard.localhost
+dials: {"gs-rogue.localhost:8445": "127.0.0.1:8445", "spacecraft.localhost:8446": "127.0.0.1:8446"}
+environments:
+  local: {registry_url: http://localhost:18081, log_url: http://localhost:18081, insecure_http: true, root_keys: ["<from scripts/local-ans.sh env>"]}
+ops:       {key_file: certs/local/ops/identity.key,  chain_file: certs/local/ops/identity.pem,  ans_name: ans://v0.1.0.ops.localhost,  agent_id: "<ops agent id>",  env: local}
+ops_wrong: {key_file: certs/local/ops2/identity.key, chain_file: certs/local/ops2/identity.pem, ans_name: ans://v0.1.0.ops2.localhost, agent_id: "<ops2 agent id>", env: local}
+authority_key_file: certs/local/authority/identity.key
+authority_ans: ans://v0.1.0.authority.localhost
+other_authority_key_file: certs/local/authority-other/identity.key
+other_authority_ans: ans://v0.1.0.authority.other.localhost

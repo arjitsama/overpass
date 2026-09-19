@@ -61,6 +61,9 @@ func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b 
 	if cfg.Role == "spacecraft" {
 		return spacecraftRole(ctx, cfg, r, log)
 	}
+	if cfg.Role == "auditor" {
+		return auditorRole(cfg, id, b, log, r)
+	}
 	if cfg.Role != "station" && cfg.Role != "authority" {
 		return r, nil
 	}

@@ -1,0 +1,14 @@
+# Impostor gs-sva1bard: never registered on ANS, self-signed cert (no cert
+# paths -> a throwaway self-signed one). It answers like a station but has no
+# _ans-badge record, so callers refuse it at verification before any quote.
+role: station
+host: gs-sva1bard.localhost
+port: 8447
+db_path: data/gs-sva1bard.db
+pricing: {per_minute_cents: 10, pay_to: "0xImpostor", network: base-sepolia, asset: USDC, asset_decimals: 6}
+card:
+  version: 0.1.0
+  display_name: gs-sva1bard (impostor)
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf]}

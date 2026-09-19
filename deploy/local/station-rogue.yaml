@@ -1,0 +1,28 @@
+# Honest ground station on the local ANS reference stack. Register it with
+#   scripts/local-register.sh gs-rogue.localhost 0.1.0 certs/local/gs-rogue deploy/local/station-honest.yaml
+role: station
+host: gs-rogue.localhost
+port: 8445
+cert: {cert_file: certs/local/gs-rogue/server.pem, key_file: certs/local/gs-rogue/server.key}
+identity: {key_file: certs/local/gs-rogue/identity.key, chain_file: certs/local/gs-rogue/identity.pem}
+db_path: data/gs-rogue.db
+pricing: {per_minute_cents: 125, pay_to: "0xRogueWallet", network: base-sepolia, asset: USDC, asset_decimals: 6}
+satreg: {file: deploy/local/registry.jws, signer_key_file: deploy/local/authority.pub}
+authority_keys:
+  - {ans_name: ans://v0.1.0.authority.localhost, key_file: deploy/local/authority.pub}
+session: {spacecraft_url: https://spacecraft.localhost:8446, spacecraft_ca: certs/local/spacecraft/server.pem, ops_env: local}
+card:
+  version: 0.1.0
+  display_name: Rogue Station
+  description: UHF ground station on the local ANS stack.
+  org_name: Overpass
+  signed_file: certs/local/gs-rogue/agent-card.json
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf, downlink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf, downlink-uhf]}
+    - {id: relay_command, name: Relay command}
+    - {id: session_evidence, name: Session evidence}
+environments:
+  local: {registry_url: http://localhost:18080, log_url: http://localhost:18081, log_public_url: https://localhost:18081, finder_url: http://localhost:18082/v1, dns_server: 127.0.0.1:15353, insecure_http: true, root_keys: ["<from scripts/local-ans.sh env>"]}
+rogue: true
+rogue_ack: i-am-the-rogue-station

@@ -1,0 +1,26 @@
+# Honest ground station on the local ANS reference stack. Register it with
+#   scripts/local-register.sh gs-blacksburg.localhost 0.1.0 certs/local/gs-blacksburg deploy/local/station-honest.yaml
+role: station
+host: gs-blacksburg.localhost
+port: 8444
+cert: {cert_file: certs/local/gs-blacksburg/server.pem, key_file: certs/local/gs-blacksburg/server.key}
+identity: {key_file: certs/local/gs-blacksburg/identity.key, chain_file: certs/local/gs-blacksburg/identity.pem}
+db_path: data/gs-blacksburg.db
+pricing: {per_minute_cents: 125, pay_to: "0xBlacksburgWallet", network: base-sepolia, asset: USDC, asset_decimals: 6}
+satreg: {file: deploy/local/registry.jws, signer_key_file: deploy/local/authority.pub}
+authority_keys:
+  - {ans_name: ans://v0.1.0.authority.localhost, key_file: deploy/local/authority.pub}
+session: {spacecraft_url: https://spacecraft.localhost:8446, spacecraft_ca: certs/local/spacecraft/server.pem, ops_env: local}
+card:
+  version: 0.1.0
+  display_name: Ground Station Blacksburg
+  description: UHF ground station on the local ANS stack.
+  org_name: Overpass
+  signed_file: certs/local/gs-blacksburg/agent-card.json
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf, downlink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf, downlink-uhf]}
+    - {id: relay_command, name: Relay command}
+    - {id: session_evidence, name: Session evidence}
+environments:
+  local: {registry_url: http://localhost:18080, log_url: http://localhost:18081, log_public_url: https://localhost:18081, finder_url: http://localhost:18082/v1, dns_server: 127.0.0.1:15353, insecure_http: true, root_keys: ["<from scripts/local-ans.sh env>"]}

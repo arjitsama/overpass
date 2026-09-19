@@ -145,6 +145,24 @@ bin/passes -refresh-tle                  # fetch the current TLE from CelesTrak 
 
   On a cut, Ops discards queued commands and replans.
 
+## Attack battery and auditor
+
+```sh
+bin/battery run    -config deploy/local/battery-honest.yaml           # 23 checks, exits 0 if all BLOCKED
+bin/battery run    -config deploy/local/battery-rogue.yaml -expect-vulnerable
+bin/battery <name> -config deploy/local/battery-honest.yaml           # one attack
+bin/battery canary -config deploy/local/battery-honest.yaml           # the two auditor probes
+```
+
+- **`internal/battery`** runs every attack in master plan section 10 (the 12-row table, the 3
+  probes, and the Overpass-only checks) against a station over A2A, reporting BLOCKED, VULNERABLE
+  or INCONCLUSIVE with the code observed. It gates a deploy: `AllBlocked` must hold for an honest
+  station.
+- **`internal/auditor`** audits a finished pass (re-verify identity, mandate, receipt, chain heads,
+  missing acks; sign an `overpass-audit+jws`) and runs canary probes a correct station rejects; an
+  acceptance is `CANARY_ACCEPTED`. Results go to a `TrustSink` (Phase 8).
+- **Adversary profiles:** `deploy/local/` (honest, rogue, impostor, lookalike). See its README.
+
 ## Local ANS stack
 
 ```sh
