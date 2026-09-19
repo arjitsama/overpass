@@ -57,6 +57,7 @@ func run(ctx context.Context, args []string, logw io.Writer) error {
 	}
 	ln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(cfg.Port)))
 	if err != nil {
+		a.stop()
 		return errs.New(errs.Unavailable, fmt.Sprintf("listen on port %d: %v", cfg.Port, err))
 	}
 	return a.serve(ctx, ln)

@@ -27,6 +27,9 @@ const (
 	// Any JWS whose typ is not the one the verifier expects (checked first).
 	TypRejected Code = "TYP_REJECTED"
 
+	// Inbound caller authentication (DPoP + SCITT receipt + status token) failed.
+	CallerRejected Code = "CALLER_REJECTED"
+
 	// book_pass checks, in order (section 8.5).
 	MandateParseError        Code = "MANDATE_PARSE_ERROR"
 	MandateRejectedSignature Code = "MANDATE_REJECTED:signature"

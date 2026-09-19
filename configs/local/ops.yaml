@@ -1,7 +1,19 @@
-# Local Mission Ops. No cert paths: the agent makes a throwaway self-signed cert.
+# Local Mission Ops. No cert or identity paths: the agent makes throwaway
+# self-signed ones in memory. Anything left out of `card` is left out of the
+# served files rather than faked.
 role: ops
 host: ops.localhost
 port: 8443
 peers:
   - name: gs-blacksburg
     url: https://localhost:8444
+card:
+  version: 0.1.0
+  display_name: Overpass Mission Ops
+  description: Plans satellite passes, requests mandates from the mission authority, books ground stations and signs spacecraft commands.
+  org_name: Overpass
+  skills:
+    - id: plan_passes
+      name: Plan passes
+      description: Proposes a pass schedule for a satellite across verified ground stations.
+      tags: [plan-passes]

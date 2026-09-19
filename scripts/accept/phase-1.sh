@@ -13,18 +13,31 @@ cd "$(dirname "$0")/../.."
 FUZZTIME=${FUZZTIME:-30s}
 
 step() { echo "== $1"; }
-run() { go test -count=1 "$@" >/dev/null || { go test -count=1 -v "$@" | tail -40 >&2; echo "FAIL: $*" >&2; exit 1; }; echo "ok"; }
+fail() { echo "FAIL: $*" >&2; exit 1; }
+# run PKG TEST... runs the named tests and requires each to report PASS, so a
+# renamed or deleted test cannot pass as "no tests to run".
+run() {
+  local pkg=$1; shift
+  local pattern out
+  pattern="^($(IFS='|'; echo "$*"))\$"
+  out=$(go test -count=1 -v "$pkg" -run "$pattern" 2>&1) || { tail -40 <<<"$out" >&2; fail "go test $pkg $*"; }
+  for name in "$@"; do
+    grep -q -- "--- PASS: $name " <<<"$out" || fail "$name did not run in $pkg"
+  done
+  echo "ok"
+}
+fuzz() { go test -count=1 "$@" >/dev/null || { go test -count=1 -v "$@" | tail -40 >&2; fail "go test $*"; }; echo "ok"; }
 
-step "1: RFC 8785 vectors";           run ./internal/jose -run '^TestJCSVectors$'
-step "2: round trip and tamper";      run ./internal/schema -run '^(TestSignVerifyRoundTrip|TestTamperEveryByte)$'
-                                      run ./internal/jose -run '^TestEveryByteFlipFails$'
-step "2: fuzz mandate ($FUZZTIME)";   run ./internal/schema -run '^$' -fuzz '^FuzzVerifyMandate$' -fuzztime "$FUZZTIME"
-step "2: fuzz command ($FUZZTIME)";   run ./internal/schema -run '^$' -fuzz '^FuzzVerifyCommand$' -fuzztime "$FUZZTIME"
-step "3: typ confusion";              run ./internal/schema -run '^TestTypConfusion$'
-                                      run ./internal/jose -run '^TestWrongTypRejectedFirst$'
-step "4: floats rejected";            run ./internal/schema -run '^TestFloatRejectedAtDecode$'
-                                      run ./internal/jose -run '^TestStrictJSONIntegersOnly$'
-step "5: chain heads";                run ./internal/chain -run '^TestChainDeterministic$'
-step "6: RFC 7638 thumbprint";        run ./internal/jose -run '^(TestThumbprintRFC7638|TestThumbprintMatchesSDK)$'
-step "docs/schemas.md examples";      run ./internal/schema -run '^TestSchemasDocExamples$'
+step "1: RFC 8785 vectors";           run ./internal/jose TestJCSVectors
+step "2: round trip and tamper";      run ./internal/schema TestSignVerifyRoundTrip TestTamperEveryByte
+                                      run ./internal/jose TestEveryByteFlipFails
+step "2: fuzz mandate ($FUZZTIME)";   fuzz ./internal/schema -run '^$' -fuzz '^FuzzVerifyMandate$' -fuzztime "$FUZZTIME"
+step "2: fuzz command ($FUZZTIME)";   fuzz ./internal/schema -run '^$' -fuzz '^FuzzVerifyCommand$' -fuzztime "$FUZZTIME"
+step "3: typ confusion";              run ./internal/schema TestTypConfusion
+                                      run ./internal/jose TestWrongTypRejectedFirst
+step "4: floats rejected";            run ./internal/schema TestFloatRejectedAtDecode
+                                      run ./internal/jose TestStrictJSONIntegersOnly
+step "5: chain heads";                run ./internal/chain TestChainDeterministic
+step "6: RFC 7638 thumbprint";        run ./internal/jose TestThumbprintRFC7638 TestThumbprintMatchesSDK
+step "docs/schemas.md examples";      run ./internal/schema TestSchemasDocExamples
 echo "phase-1 acceptance: pass"

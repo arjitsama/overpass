@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/arjitsama/overpass/internal/a2a"
 	"github.com/arjitsama/overpass/internal/bus"
 	"github.com/arjitsama/overpass/internal/config"
 	"github.com/arjitsama/overpass/internal/errs"
+	"github.com/arjitsama/overpass/internal/wellknown"
 )
 
 const (
@@ -21,10 +22,14 @@ const (
 )
 
 type agent struct {
-	cfg config.Config
-	bus *bus.Bus
-	log *slog.Logger
-	tls *tls.Config
+	cfg   config.Config
+	bus   *bus.Bus
+	log   *slog.Logger
+	tls   *tls.Config
+	files wellknown.Files
+	sec   a2a.Security // what is mounted; the card is generated from it
+	rpc   http.Handler
+	stop  context.CancelFunc // ends background work (replay cache sweeper)
 }
 
 func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
@@ -32,34 +37,66 @@ func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
 	if err != nil {
 		return nil, err
 	}
+	id, err := wellknown.LoadIdentity(cfg.Identity, wellknown.ANSName(cfg))
+	if err != nil {
+		return nil, err
+	}
+	if id.Local {
+		log.Warn("no identity configured; using a throwaway identity key (local only)")
+	}
+	ctx, stop := context.WithCancel(context.Background())
+	sec, err := securityFor(ctx, cfg, log)
+	if err != nil {
+		stop()
+		return nil, err
+	}
+	files, err := wellknown.Build(wellknown.Input{Config: cfg, Identity: id, Security: sec})
+	if err != nil {
+		stop()
+		return nil, err
+	}
 	return &agent{
-		cfg: cfg,
-		bus: bus.New(bus.DefaultBacklog, bus.DefaultMaxSubs),
-		log: log,
-		tls: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}},
+		cfg:   cfg,
+		bus:   bus.New(bus.DefaultBacklog, bus.DefaultMaxSubs),
+		log:   log,
+		tls:   &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}},
+		files: files,
+		sec:   sec,
+		rpc:   a2aServer(cfg, sec, log).Handler(),
+		stop:  stop,
 	}, nil
 }
 
 func (a *agent) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", a.health)
 	mux.Handle("/events", a.bus.Handler())
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		errs.Write(w, http.StatusNotFound, errs.NotFound, "no route "+r.URL.Path)
-	})
+	mux.HandleFunc("/", a.root)
 	return a.recoverMW(limitBody(mux))
 }
 
-func (a *agent) health(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		errs.Write(w, http.StatusMethodNotAllowed, errs.MethodNotAllowed, "use GET")
+// root serves A2A JSON-RPC on POST / and the generated files on GET.
+func (a *agent) root(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" && r.Method == http.MethodPost {
+		a.rpc.ServeHTTP(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok", "role": a.cfg.Role, "host": a.cfg.Host,
-	})
+	f, ok := a.files[r.URL.Path]
+	if !ok {
+		errs.Write(w, http.StatusNotFound, errs.NotFound, "no route "+r.URL.Path)
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		allow := "GET, HEAD"
+		if r.URL.Path == "/" {
+			allow += ", POST"
+		}
+		w.Header().Set("Allow", allow)
+		errs.Write(w, http.StatusMethodNotAllowed, errs.MethodNotAllowed, "use "+allow)
+		return
+	}
+	w.Header().Set("Content-Type", f.ContentType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(f.Body)
 }
 
 // recoverMW turns a handler panic into a named internal error.
@@ -112,6 +149,7 @@ func limitBody(next http.Handler) http.Handler {
 
 // serve runs HTTPS on ln until ctx is done, then shuts down cleanly.
 func (a *agent) serve(ctx context.Context, ln net.Listener) error {
+	defer a.stop()
 	srv := &http.Server{
 		Handler:           a.routes(),
 		TLSConfig:         a.tls,

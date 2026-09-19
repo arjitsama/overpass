@@ -1,7 +1,23 @@
-# Local ground station. No cert paths: the agent makes a throwaway self-signed cert.
+# Local ground station. No cert or identity paths: the agent makes throwaway
+# self-signed ones in memory. No trust_roots: every inbound A2A call is
+# rejected (fail closed) until the transparency log root keys are configured.
 role: station
 host: gs-blacksburg.localhost
 port: 8444
 peers:
   - name: ops
     url: https://localhost:8443
+card:
+  version: 0.1.0
+  display_name: Ground Station Blacksburg
+  description: UHF ground station. Quotes and books passes; relays Ops-signed commands only inside a mandate's window.
+  org_name: Overpass
+  skills:
+    - id: get_pass_quote
+      name: Pass quote
+      description: Prices a pass for a NORAD ID, AOS, LOS and mode, in integer cents.
+      tags: [uplink-uhf, downlink-uhf]
+    - id: book_pass
+      name: Book pass
+      description: Books a quoted pass. Requires an authority-signed mandate and a DPoP proof.
+      tags: [uplink-uhf, downlink-uhf]

@@ -3,7 +3,7 @@
 BIN := bin/agent
 
 build:
-	go build -o $(BIN) ./cmd/agent
+	go build -o bin/ ./cmd/agent ./cmd/cardhash
 
 test:
 	go test -race ./...

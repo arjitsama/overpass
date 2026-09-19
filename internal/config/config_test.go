@@ -54,6 +54,19 @@ func TestLoadValid(t *testing.T) {
 	if c.RegistryURL != DefaultRegistryURL || c.LogURL != DefaultLogURL {
 		t.Fatalf("defaults not applied: %+v", c)
 	}
+	if c.PublicURL != "https://gs-blacksburg.localhost:8444" || c.Card.Version != "0.1.0" || !c.Card.Tier2On() {
+		t.Fatalf("card defaults: %+v", c)
+	}
+	d := Config{Role: "ops", Host: "ops.example", Port: 443, PublicURL: "https://ops.example/"}
+	d.ApplyDefaults()
+	if d.PublicURL != "https://ops.example" || d.Validate() != nil {
+		t.Fatalf("trailing slash: %q %v", d.PublicURL, d.Validate())
+	}
+	e := Config{Role: "ops", Host: "ops.example", Port: 443}
+	e.ApplyDefaults()
+	if e.PublicURL != "https://ops.example" {
+		t.Fatalf("port 443 default: %q", e.PublicURL)
+	}
 }
 
 func TestLoadRejectsUnknownField(t *testing.T) {
@@ -96,7 +109,8 @@ func TestEnvBadPort(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	base := Config{Role: "ops", Port: 8443, RegistryURL: DefaultRegistryURL, LogURL: DefaultLogURL}
+	base := Config{Role: "ops", Port: 8443}
+	base.ApplyDefaults()
 	cases := map[string]func(*Config){
 		"bad role":         func(c *Config) { c.Role = "rogue" },
 		"port zero":        func(c *Config) { c.Port = 0 },
@@ -105,6 +119,14 @@ func TestValidate(t *testing.T) {
 		"http registry":    func(c *Config) { c.RegistryURL = "http://api.godaddy.com" },
 		"peer no name":     func(c *Config) { c.Peers = []Peer{{URL: "https://x"}} },
 		"peer bad url":     func(c *Config) { c.Peers = []Peer{{Name: "x", URL: "::"}} },
+		"identity half":    func(c *Config) { c.Identity.KeyFile = "k.pem" },
+		"bad version":      func(c *Config) { c.Card.Version = "1.0" },
+		"dup skill":        func(c *Config) { c.Card.Skills = []Skill{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}} },
+		"http public url":  func(c *Config) { c.PublicURL = "http://x" },
+		"public url path":  func(c *Config) { c.PublicURL = "https://localhost:8443/a2a" },
+		"public url query": func(c *Config) { c.PublicURL = "https://localhost:8443?x=1" },
+		"public url user":  func(c *Config) { c.PublicURL = "https://u@localhost:8443" },
+		"public url host":  func(c *Config) { c.PublicURL = "https://evil.example:8443" },
 	}
 	if err := base.Validate(); err != nil {
 		t.Fatalf("base invalid: %v", err)

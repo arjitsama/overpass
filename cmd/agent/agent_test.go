@@ -30,11 +30,13 @@ type running struct {
 	client *http.Client
 	stop   context.CancelFunc
 	done   chan error
+	agent  *agent
 }
 
 func testConfig(role string) config.Config {
-	return config.Config{Role: role, Host: role + ".localhost", Port: 1,
-		RegistryURL: config.DefaultRegistryURL, LogURL: config.DefaultLogURL}
+	c := config.Config{Role: role, Host: role + ".localhost", Port: 8443}
+	c.ApplyDefaults()
+	return c
 }
 
 func start(t *testing.T, cfg config.Config) *running {
@@ -56,7 +58,7 @@ func start(t *testing.T, cfg config.Config) *running {
 		TLSClientConfig:   &tls.Config{RootCAs: pool, ServerName: "localhost"},
 		ForceAttemptHTTP2: true, // browsers and curl use h2; test what they get
 	}}
-	r := &running{url: "https://" + ln.Addr().String(), client: client, stop: stop, done: done}
+	r := &running{url: "https://" + ln.Addr().String(), client: client, stop: stop, done: done, agent: a}
 	t.Cleanup(func() {
 		stop()
 		<-done

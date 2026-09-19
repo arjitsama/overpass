@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -40,14 +41,52 @@ type Peer struct {
 	URL  string `yaml:"url"`
 }
 
+// Identity holds paths to the ANS identity key (EC P-256, PEM) and its
+// certificate chain (PEM, leaf first). Empty means a throwaway local identity.
+type Identity struct {
+	KeyFile   string `yaml:"key_file"`
+	ChainFile string `yaml:"chain_file"`
+}
+
+// Skill is one A2A skill as the card lists it.
+type Skill struct {
+	ID          string   `yaml:"id"`
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Tags        []string `yaml:"tags"`
+	Examples    []string `yaml:"examples"`
+}
+
+// Card is what the well-known files say about the agent. Anything empty is
+// left out of the files rather than faked.
+type Card struct {
+	Version     string  `yaml:"version"`
+	DisplayName string  `yaml:"display_name"`
+	Description string  `yaml:"description"`
+	OrgName     string  `yaml:"org_name"`
+	OrgURL      string  `yaml:"org_url"`
+	AgentID     string  `yaml:"agent_id"`
+	ReceiptFile string  `yaml:"receipt_file"` // base64 SCITT receipt from the log
+	TLAgentURL  string  `yaml:"tl_agent_url"` // transparency log URL for this agent
+	DNSAID      bool    `yaml:"dns_aid"`      // set only once the SVCB record exists
+	Tier2       *bool   `yaml:"tier2"`        // default true
+	Skills      []Skill `yaml:"skills"`
+}
+
+// Tier2On reports whether tier-2 files are served (default true).
+func (c Card) Tier2On() bool { return c.Tier2 == nil || *c.Tier2 }
+
 // Config is one agent's configuration.
 type Config struct {
 	Role        string   `yaml:"role"`
 	Host        string   `yaml:"host"`
 	Port        int      `yaml:"port"`
+	PublicURL   string   `yaml:"public_url"`
 	Cert        Cert     `yaml:"cert"`
+	Identity    Identity `yaml:"identity"`
+	Card        Card     `yaml:"card"`
 	Peers       []Peer   `yaml:"peers"`
-	TrustRoots  []string `yaml:"trust_roots"`
+	TrustRoots  []string `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
 	RegistryURL string   `yaml:"registry_url"`
 	LogURL      string   `yaml:"log_url"`
 }
@@ -70,7 +109,7 @@ func Load(path string) (Config, error) {
 	if err := c.applyEnv(os.LookupEnv); err != nil {
 		return Config{}, err
 	}
-	c.applyDefaults()
+	c.ApplyDefaults()
 	return c, c.Validate()
 }
 
@@ -115,7 +154,8 @@ func (c *Config) applyEnv(lookup func(string) (string, bool)) error {
 	return nil
 }
 
-func (c *Config) applyDefaults() {
+// ApplyDefaults fills unset fields with their defaults.
+func (c *Config) ApplyDefaults() {
 	if c.RegistryURL == "" {
 		c.RegistryURL = DefaultRegistryURL
 	}
@@ -124,6 +164,19 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Host == "" {
 		c.Host = "localhost"
+	}
+	c.PublicURL = strings.TrimSuffix(c.PublicURL, "/")
+	if c.PublicURL == "" {
+		c.PublicURL = "https://" + c.Host
+		if c.Port != 443 {
+			c.PublicURL += ":" + strconv.Itoa(c.Port)
+		}
+	}
+	if c.Card.Version == "" {
+		c.Card.Version = "0.1.0"
+	}
+	if c.Card.DisplayName == "" {
+		c.Card.DisplayName = c.Host
 	}
 }
 
@@ -137,6 +190,22 @@ func (c Config) Validate() error {
 	}
 	if (c.Cert.CertFile == "") != (c.Cert.KeyFile == "") {
 		return errs.New(errs.BadRequest, "cert_file and key_file must both be set or both be empty")
+	}
+	if (c.Identity.KeyFile == "") != (c.Identity.ChainFile == "") {
+		return errs.New(errs.BadRequest, "identity key_file and chain_file must both be set or both be empty")
+	}
+	if !semver(c.Card.Version) {
+		return errs.New(errs.BadRequest, fmt.Sprintf("card version %q must be MAJOR.MINOR.PATCH", c.Card.Version))
+	}
+	seen := map[string]bool{}
+	for _, s := range c.Card.Skills {
+		if s.ID == "" || s.Name == "" || seen[s.ID] {
+			return errs.New(errs.BadRequest, fmt.Sprintf("skill %q needs a unique id and a name", s.ID))
+		}
+		seen[s.ID] = true
+	}
+	if err := c.checkPublicURL(); err != nil {
+		return err
 	}
 	for _, u := range []string{c.RegistryURL, c.LogURL} {
 		if err := checkHTTPSURL(u); err != nil {
@@ -154,6 +223,20 @@ func (c Config) Validate() error {
 	return nil
 }
 
+// semver accepts N.N.N with decimal numbers (the ANS name embeds it).
+func semver(v string) bool {
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, p := range parts {
+		if _, err := strconv.ParseUint(p, 10, 32); err != nil || p == "" {
+			return false
+		}
+	}
+	return true
+}
+
 func validRole(r string) bool {
 	for _, v := range Roles {
 		if r == v {
@@ -161,6 +244,20 @@ func validRole(r string) bool {
 		}
 	}
 	return false
+}
+
+// checkPublicURL: https://<host>[:port] with no path, query, fragment or
+// userinfo, on this agent's own host, so the card, jku and trust card agree.
+func (c Config) checkPublicURL() error {
+	u, err := url.Parse(c.PublicURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" || (u.Path != "" && u.Path != "/") ||
+		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.User != nil {
+		return errs.New(errs.BadRequest, fmt.Sprintf("public_url %q must be https://<host>[:port]", c.PublicURL))
+	}
+	if !strings.EqualFold(u.Hostname(), c.Host) {
+		return errs.New(errs.BadRequest, fmt.Sprintf("public_url host %q must equal host %q", u.Hostname(), c.Host))
+	}
+	return nil
 }
 
 func checkHTTPSURL(s string) error {
