@@ -126,6 +126,25 @@ bin/passes -refresh-tle                  # fetch the current TLE from CelesTrak 
 - **Satellite registry.** `bin/satreg sign|pubkey` signs the registry that stations pin
   (`satreg.file`, `satreg.signer_key_file`).
 
+## Pass session
+
+- **Station `relay_command {booking_id, command}`.**
+  - It's open from the mandate's `nbf − 30 s` to `exp + 30 s`; outside that it's `WINDOW_CLOSED`.
+  - It checks DPoP key = the mandate's `jkt`, typ, class in `command_classes` (else
+    `CLASS_REJECTED`), and `mandate_id`.
+  - It relays the Ops-signed command, untouched, to the spacecraft agent (`uplink`), appends the
+    CommandRecord, and returns the spacecraft's Ack.
+- **Station `session_evidence {booking_id}`.** Returns the chain head, records, Acks, and suspected
+  drops.
+- **Spacecraft (`role: spacecraft`).** Accepts only Ops-signed `overpass-cmd+jws` commands for its
+  NORAD ID with a strictly greater counter, which is persisted.
+- **Token loop.** Both sides check the other's status token every 30 s:
+  - a token that isn't ACTIVE cuts the session (`SESSION_CUT:revoked`)
+  - a newest token older than 10 min cuts it (`SESSION_CUT:token_stale`)
+  - a failed fetch alone only warns
+
+  On a cut, Ops discards queued commands and replans.
+
 ## Local ANS stack
 
 ```sh

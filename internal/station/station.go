@@ -39,6 +39,7 @@ const (
 // Caller is the proven identity of whoever called: from the DPoP guard.
 type Caller struct {
 	ANSName string
+	AgentID string
 	JKT     string
 }
 
@@ -51,7 +52,7 @@ func PopCaller(ctx context.Context) (Caller, bool) {
 	if !ok || id == nil {
 		return Caller{}, false
 	}
-	return Caller{ANSName: id.AnsName, JKT: id.JKT}, true
+	return Caller{ANSName: id.AnsName, AgentID: id.AgentID, JKT: id.JKT}, true
 }
 
 // KeySource returns an issuer's trusted mandate-signing keys (check 2).
@@ -344,7 +345,7 @@ func (s *Station) book(ctx context.Context, raw json.RawMessage) (BookResult, er
 		return BookResult{}, err
 	}
 	if err := s.Store.Book(ctx, store.Booking{BookingID: bookingID, QuoteID: q.QuoteID, MandateID: m.MandateID,
-		Iss: m.Iss, Nonce: m.Nonce, NoradID: q.NoradID, Nbf: m.Nbf, Exp: m.Exp, Receipt: receipt}); err != nil {
+		Iss: m.Iss, Nonce: m.Nonce, Mandate: a.Mandate, NoradID: q.NoradID, Nbf: m.Nbf, Exp: m.Exp, Receipt: receipt}); err != nil {
 		return BookResult{}, err
 	}
 	return BookResult{BookingID: bookingID, Nbf: m.Nbf, Exp: m.Exp, Receipt: receipt}, nil

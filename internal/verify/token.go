@@ -59,8 +59,16 @@ type Decision struct {
 	Allow   bool
 	Warning string // set when allowed on an older held token
 	Reason  string // set when denied
+	Kind    string // why denied: DenyRevoked, DenyStale or DenyUnavailable
 	Token   *Token // the token the decision rests on
 }
+
+// Denial kinds.
+const (
+	DenyRevoked     = "revoked"     // a fetched token is not ACTIVE
+	DenyStale       = "token_stale" // the newest held token is older than MaxAge
+	DenyUnavailable = "unavailable" // no token was ever fetched
+)
 
 // Decide applies master plan 9.6:
 //   - a fetched token that is not ACTIVE denies at once
@@ -70,7 +78,7 @@ type Decision struct {
 func (p Policy) Decide(held, fresh *Token, fetchErr error, now time.Time) Decision {
 	if fetchErr == nil && fresh != nil {
 		if fresh.Status != scitt.StatusActive {
-			return Decision{Reason: fmt.Sprintf("status token says %s", fresh.Status), Token: fresh}
+			return Decision{Reason: fmt.Sprintf("status token says %s", fresh.Status), Kind: DenyRevoked, Token: fresh}
 		}
 		return Decision{Allow: true, Token: fresh}
 	}
@@ -79,12 +87,12 @@ func (p Policy) Decide(held, fresh *Token, fetchErr error, now time.Time) Decisi
 		why = fetchErr.Error()
 	}
 	if held == nil || held.Status != scitt.StatusActive {
-		return Decision{Reason: "status token unavailable (" + why + ") and none held"}
+		return Decision{Reason: "status token unavailable (" + why + ") and none held", Kind: DenyUnavailable}
 	}
 	age := now.Sub(held.Iat)
 	if age >= p.MaxAge {
 		return Decision{Reason: fmt.Sprintf("status token unavailable (%s); newest held is %s old, over %s",
-			why, age.Round(time.Second), p.MaxAge), Token: held}
+			why, age.Round(time.Second), p.MaxAge), Kind: DenyStale, Token: held}
 	}
 	return Decision{Allow: true, Token: held,
 		Warning: fmt.Sprintf("status token fetch failed (%s); using one %s old", why, age.Round(time.Second))}
@@ -95,7 +103,7 @@ func (p Policy) Decide(held, fresh *Token, fetchErr error, now time.Time) Decisi
 type Keeper struct {
 	Policy  Policy
 	fetch   func(ctx context.Context, agentID string) (*Token, error)
-	now     func() time.Time
+	Now     func() time.Time // clock; tests may replace it
 	mu      sync.Mutex
 	held    map[string]*Token
 	revoked map[string]time.Time // newest non-ACTIVE token's iat per agent
@@ -103,7 +111,7 @@ type Keeper struct {
 
 // NewKeeper returns a keeper that fetches with fetch.
 func NewKeeper(p Policy, fetch func(ctx context.Context, agentID string) (*Token, error)) *Keeper {
-	return &Keeper{Policy: p, fetch: fetch, now: time.Now, held: map[string]*Token{}, revoked: map[string]time.Time{}}
+	return &Keeper{Policy: p, fetch: fetch, Now: time.Now, held: map[string]*Token{}, revoked: map[string]time.Time{}}
 }
 
 // Check fetches a fresh token and decides.
@@ -113,11 +121,11 @@ func (k *Keeper) Check(ctx context.Context, agentID string) Decision {
 	defer k.mu.Unlock()
 	if err == nil && fresh != nil {
 		if r, ok := k.revoked[agentID]; ok && fresh.Status == scitt.StatusActive && !fresh.Iat.After(r) {
-			return Decision{Reason: "fetched ACTIVE token predates a known revocation", Token: fresh}
+			return Decision{Reason: "fetched ACTIVE token predates a known revocation", Kind: DenyRevoked, Token: fresh}
 		}
 		k.record(agentID, fresh)
 	}
-	return k.Policy.Decide(k.held[agentID], fresh, err, k.now())
+	return k.Policy.Decide(k.held[agentID], fresh, err, k.Now())
 }
 
 // record keeps the newest ACTIVE token, and never lets an ACTIVE token

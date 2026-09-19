@@ -53,6 +53,7 @@ func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
 		stop()
 		return nil, err
 	}
+	cfg = pruneSkills(cfg, r.disabled)
 	files, err := wellknown.Build(wellknown.Input{Config: cfg, Identity: id, Security: r.sec})
 	if err != nil {
 		stop()

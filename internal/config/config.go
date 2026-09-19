@@ -107,6 +107,20 @@ type FlightRules struct {
 	MaxPassesPerDay int                 `yaml:"max_passes_per_day"`
 }
 
+// SpacecraftCfg configures the simulated spacecraft role.
+type SpacecraftCfg struct {
+	NoradID    int64  `yaml:"norad_id"`
+	OpsKeyFile string `yaml:"ops_key_file"` // PEM public key of the Ops identity key
+}
+
+// SessionCfg configures a station's pass sessions.
+type SessionCfg struct {
+	SpacecraftURL string   `yaml:"spacecraft_url"` // A2A URL of the spacecraft (the RF link)
+	SpacecraftCA  string   `yaml:"spacecraft_ca"`  // PEM cert to trust for it (local self-signed runs)
+	OpsEnv        string   `yaml:"ops_env"`        // environment of the Ops agents' tokens (default prod)
+	Auditors      []string `yaml:"auditors"`       // ANS names that may read any session's evidence
+}
+
 // MaxPerMinuteCents bounds a station's price ($10,000 a minute).
 const MaxPerMinuteCents = 1_000_000
 
@@ -172,6 +186,8 @@ type Config struct {
 	OpsAgents     []string               `yaml:"ops_agents"`  // ANS names allowed to request mandates
 	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier, until Phase 8
 	FlightRules   FlightRules            `yaml:"flight_rules"`
+	Spacecraft    SpacecraftCfg          `yaml:"spacecraft"`
+	Session       SessionCfg             `yaml:"session"`
 	Rogue         bool                   `yaml:"rogue"`
 	RogueAck      string                 `yaml:"rogue_ack"`
 	Environments  map[string]Environment `yaml:"environments"`
@@ -324,6 +340,22 @@ func (c Config) Validate() error {
 	}
 	if c.Pricing.PerMinuteCents < 0 || c.Pricing.PerMinuteCents > MaxPerMinuteCents || c.Pricing.AssetDecimals < 2 || c.Pricing.AssetDecimals > 12 {
 		return errs.New(errs.BadRequest, fmt.Sprintf("pricing: per_minute_cents must be 0-%d and asset_decimals 2-12", MaxPerMinuteCents))
+	}
+	if c.Spacecraft.NoradID < 0 || c.Spacecraft.NoradID > 999_999_999 {
+		return errs.New(errs.BadRequest, "spacecraft.norad_id out of range")
+	}
+	if c.Role == "spacecraft" && c.Spacecraft.NoradID > 0 && c.Spacecraft.OpsKeyFile == "" {
+		return errs.New(errs.BadRequest, "spacecraft.ops_key_file is required with spacecraft.norad_id")
+	}
+	if c.Session.SpacecraftURL != "" {
+		if err := checkHTTPSURL(c.Session.SpacecraftURL); err != nil {
+			return err
+		}
+	}
+	if o := c.Session.OpsEnv; o != "" {
+		if _, ok := c.Environments[o]; !ok {
+			return errs.New(errs.BadRequest, "session.ops_env names an unknown environment "+o)
+		}
 	}
 	hosts := map[string]bool{}
 	for _, s := range c.Sites {

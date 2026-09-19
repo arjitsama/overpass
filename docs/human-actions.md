@@ -57,6 +57,15 @@ Tick an item (`[x]`) when it's done, and note when.
   doesn't expose the jti to handlers. The code is still `DPOP_REJECTED:replay`. (Phase 5)
 - [ ] **A mandate's own booking doesn't count as an overlap**, so replaying a spent mandate gets
   `MANDATE_REJECTED:consumed` (attack 12), not overlap. (Phase 5)
+- [ ] **Token checks:** the station re-checks the Ops token on a command at most once every 30 s,
+  besides the 30 s background loop. (Phase 6)
+- [ ] **Evidence access:** `session_evidence` is readable only by the booking's Ops agent and by ANS
+  names listed in `session.auditors`. Add the auditor's ANS name there in Phase 7. (Phase 6)
+- [ ] **Acks are unsigned.** A station could drop a command and forge an Ack; the chain heads would
+  still match. A spacecraft-signed Ack would close this. Decide whether it matters for the demo.
+  (Phase 1, 6)
+- [ ] **Local databases are versioned.** After an upgrade that changes the schema, an agent refuses an
+  old `data/*.db` with a clear message; delete the file. (Phase 6)
 - [ ] **Skill call shape `{"skill": id, ...args}` in the A2A data part.** supplier.webmesh.ai's exact
   shape wasn't captured. (Phase 2)
 
@@ -88,6 +97,20 @@ Tick an item (`[x]`) when it's done, and note when.
 - [ ] **Flight rule `max_passes_per_day` counts mandates issued**, not passes booked. An unused mandate
   still counts. Confirm or ask for release-on-expiry.
 - [ ] **Rogue station (demo):** `rogue: true` needs `rogue_ack: i-am-the-rogue-station`. Only on `gs-rogue`.
+
+## Set up per deployment (Phase 6)
+
+- [ ] **Spacecraft agent:** `role: spacecraft` with `spacecraft.norad_id` and `spacecraft.ops_key_file`.
+  The key file is the Ops identity key's public half, from `bin/satreg pubkey -key <ops identity key>`.
+- [ ] **Each station:**
+  - `session.spacecraft_url` is the spacecraft agent. Set `session.spacecraft_ca` if it's self-signed.
+  - `session.ops_env` is the environment whose log holds the Ops agent's status token.
+  - List `relay_command` and `session_evidence` in the card's skills, and freeze the card after that.
+- [ ] **Revocation demo (gate H6, master plan 9.12):**
+  - Run `ans-cli revoke <station agentId> --reason CERTIFICATE_HOLD` mid-pass. The next 30 s token
+    fetch cuts the session (`SESSION_CUT:revoked`), and Ops replans.
+  - Production revocations are permanent. Rehearse on the local stack first, and decide whether
+    `REMOVE_FROM_CRL` restores ACTIVE there.
 
 ## Before the demo
 

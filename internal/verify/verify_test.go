@@ -69,7 +69,7 @@ func TestKeeperDropsRevoked(t *testing.T) {
 		i++
 		return n.tok, n.err
 	})
-	k.now = func() time.Time { return now.Add(time.Minute) }
+	k.Now = func() time.Time { return now.Add(time.Minute) }
 	if d := k.Check(context.Background(), "a"); !d.Allow {
 		t.Fatal("active denied")
 	}
@@ -99,7 +99,7 @@ func TestKeeperOutOfOrderFetch(t *testing.T) {
 		}
 		return tok, nil
 	})
-	k.now = func() time.Time { return now.Add(time.Minute) }
+	k.Now = func() time.Time { return now.Add(time.Minute) }
 	for n := 0; n < 3; n++ {
 		if d := k.Check(context.Background(), "a"); d.Allow {
 			t.Fatalf("check %d allowed after revocation: %+v", n, d)

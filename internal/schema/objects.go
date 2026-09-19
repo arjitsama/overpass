@@ -140,6 +140,24 @@ func PeekMandate(token string) (Mandate, error) {
 	return Mandate{}, err
 }
 
+// PeekCommand checks a command's structure, typ and fields without its
+// signature: what a station checks before relaying (master plan 9.3). The
+// spacecraft verifies the Ops signature; the station need not hold the key.
+// The result is UNVERIFIED.
+func PeekCommand(token string) (Command, error) {
+	var c Command
+	_, err := jose.Verify(token, CommandProfile, nil, func(b []byte) error {
+		return decodeSigned(b, &c, errs.CommandParseError)
+	})
+	if errs.Is(err, errs.CommandRejectedSignature) {
+		return c, nil
+	}
+	if err == nil {
+		err = errs.New(errs.CommandParseError, "unexpected verification with no keys")
+	}
+	return Command{}, err
+}
+
 // Satellite is one entry in the satellite registry.
 type Satellite struct {
 	NoradID          int64    `json:"norad_id"`

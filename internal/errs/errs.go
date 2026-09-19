@@ -45,11 +45,17 @@ const (
 	MandateRejectedConsumed  Code = "MANDATE_REJECTED:consumed"
 
 	// Pass session and audit (section 9).
-	WindowClosed   Code = "WINDOW_CLOSED"
-	ClassRejected  Code = "CLASS_REJECTED"
-	CanaryAccepted Code = "CANARY_ACCEPTED"
-	ChainMismatch  Code = "CHAIN_MISMATCH"
-	AckMissing     Code = "ACK_MISSING"
+	WindowClosed          Code = "WINDOW_CLOSED"
+	SessionCutRevoked     Code = "SESSION_CUT:revoked"
+	SessionCutStale       Code = "SESSION_CUT:token_stale"
+	SessionRejectedBooked Code = "SESSION_REJECTED:booking"
+	SessionRejectedToken  Code = "SESSION_REJECTED:token_unavailable"
+	SessionRejectedCaller Code = "SESSION_REJECTED:caller"
+	CommandRejectedMandID Code = "COMMAND_REJECTED:mandate_id"
+	ClassRejected         Code = "CLASS_REJECTED"
+	CanaryAccepted        Code = "CANARY_ACCEPTED"
+	ChainMismatch         Code = "CHAIN_MISMATCH"
+	AckMissing            Code = "ACK_MISSING"
 
 	// Trust and cards (section 10).
 	PolicyRefusedTier Code = "POLICY_REFUSED:tier"
@@ -128,3 +134,85 @@ func Write(w http.ResponseWriter, status int, code Code, detail string) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(Error{Code: code, Detail: detail})
 }
+
+// all lists every declared code (kept in step with the constants above; a
+// test checks it).
+var all = []Code{
+	BadRequest,
+	NotFound,
+	MethodNotAllowed,
+	PayloadTooLarge,
+	Unavailable,
+	Internal,
+	TypRejected,
+	CallerRejected,
+	MandateParseError,
+	MandateRejectedSignature,
+	MandateRejectedNotOwner,
+	MandateRejectedAudience,
+	MandateRejectedQuote,
+	MandateRejectedScope,
+	MandateRejectedAmount,
+	MandateRejectedWindow,
+	DPoPRejectedKey,
+	DPoPRejectedReplay,
+	BookingRejectedOverlap,
+	MandateRejectedConsumed,
+	WindowClosed,
+	SessionCutRevoked,
+	SessionCutStale,
+	SessionRejectedBooked,
+	SessionRejectedToken,
+	SessionRejectedCaller,
+	CommandRejectedMandID,
+	ClassRejected,
+	CanaryAccepted,
+	ChainMismatch,
+	AckMissing,
+	PolicyRefusedTier,
+	PolicyRefusedCaller,
+	PolicyRefusedUnverified,
+	PolicyRefusedStation,
+	PolicyRefusedClasses,
+	PolicyRefusedAmount,
+	PolicyRefusedDailyLimit,
+	PolicyRefusedWindow,
+	QuoteRejectedWindow,
+	QuoteRejectedNorad,
+	PlanUnverified,
+	PlanNoQuote,
+	PlanBadPrice,
+	PlanOverlap,
+	PlanGoalMet,
+	PlanExcluded,
+	PlanUnknownHost,
+	CardRejectedJKU,
+	CardClaimMismatch,
+	CommandParseError,
+	CommandRejectedSignature,
+	CommandRejectedNorad,
+	CommandRejectedCounter,
+	SatRegParseError,
+	SatRegRejectedSignature,
+	AuditParseError,
+	AuditRejectedSignature,
+	ReceiptParseError,
+	ReceiptRejectedSignature,
+	CardParseError,
+	CardRejectedSignature,
+	QuoteParseError,
+	AckParseError,
+	RecordParseError,
+}
+
+var known = func() map[Code]bool {
+	m := make(map[Code]bool, len(all))
+	for _, c := range all {
+		m[c] = true
+	}
+	return m
+}()
+
+// Known reports whether c is a code declared in this package. Codes that
+// arrive from another agent are passed on only if known (rule 4).
+func Known(c Code) bool { return known[c] }

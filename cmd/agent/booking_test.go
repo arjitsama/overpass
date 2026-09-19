@@ -59,6 +59,13 @@ func bookingStation(t *testing.T) (*running, *ecdsa.PrivateKey, *demokit.Bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return bookingStationWith(t, tlKey, bundle, nil)
+}
+
+// bookingStationWith is bookingStation with a given log key and Ops bundle,
+// and a hook to adjust the config.
+func bookingStationWith(t *testing.T, tlKey *ecdsa.PrivateKey, bundle *demokit.Bundle, adjust func(*config.Config)) (*running, *ecdsa.PrivateKey, *demokit.Bundle) {
+	t.Helper()
 	authKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	dir := t.TempDir()
 	authName := "ans://v0.1.0.authority.localhost"
@@ -77,6 +84,9 @@ func bookingStation(t *testing.T) (*running, *ecdsa.PrivateKey, *demokit.Bundle)
 	c.SatReg = config.SatReg{File: regPath, SignerKeyFile: pub}
 	c.AuthorityKeys = []config.AuthorityKey{{ANSName: authName, KeyFile: pub}}
 	c.Pricing = config.Pricing{PerMinuteCents: 125, PayTo: "0xGroundStationBlacksburg", Network: "base-sepolia", Asset: "USDC", AssetDecimals: 6}
+	if adjust != nil {
+		adjust(&c)
+	}
 	return start(t, c), authKey, bundle
 }
 

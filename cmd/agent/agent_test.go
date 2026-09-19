@@ -41,6 +41,9 @@ func testConfig(role string) config.Config {
 
 func start(t *testing.T, cfg config.Config) *running {
 	t.Helper()
+	if cfg.DBPath == "" || !filepath.IsAbs(cfg.DBPath) {
+		cfg.DBPath = filepath.Join(t.TempDir(), "agent.db") // never write into the source tree
+	}
 	a, err := newAgent(cfg, quiet)
 	if err != nil {
 		t.Fatal(err)

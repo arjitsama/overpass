@@ -28,6 +28,27 @@ type role struct {
 	sec      a2a.Security
 	handlers map[string]a2a.Handler
 	close    func()
+	disabled []string // skills switched off for want of config: pruned from the card
+}
+
+// pruneSkills drops disabled skills from the card, so it never lists a
+// skill the agent cannot serve (rule 6).
+func pruneSkills(cfg config.Config, disabled []string) config.Config {
+	if len(disabled) == 0 {
+		return cfg
+	}
+	off := map[string]bool{}
+	for _, d := range disabled {
+		off[d] = true
+	}
+	kept := make([]config.Skill, 0, len(cfg.Card.Skills))
+	for _, s := range cfg.Card.Skills {
+		if !off[s.ID] {
+			kept = append(kept, s)
+		}
+	}
+	cfg.Card.Skills = kept
+	return cfg
 }
 
 // buildRole wires the role's skills. The agent card is generated from the
@@ -37,6 +58,9 @@ type role struct {
 //   - ops, auditor, spacecraft: noAuth
 func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b *bus.Bus, log *slog.Logger) (role, error) {
 	r := role{sec: a2a.Security{Skill: map[string][]a2a.SkillGuard{}}, handlers: map[string]a2a.Handler{}, close: func() {}}
+	if cfg.Role == "spacecraft" {
+		return spacecraftRole(ctx, cfg, r, log)
+	}
 	if cfg.Role != "station" && cfg.Role != "authority" {
 		return r, nil
 	}
@@ -61,6 +85,10 @@ func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b 
 		r.sec.Skill["book_pass"] = []a2a.SkillGuard{a2a.MandateDeclared()}
 		r.handlers["get_pass_quote"] = st.GetPassQuote
 		r.handlers["book_pass"] = st.BookPass
+		if err := sessionSkills(cfg, db, emit, log, &r); err != nil {
+			r.close()
+			return r, err
+		}
 		return r, nil
 	}
 	v, err := verify.New(cfg, verify.Options{Self: cfg.Host, Emit: emit, Log: log})

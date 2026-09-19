@@ -70,7 +70,12 @@ CREATE TABLE IF NOT EXISTS bookings (
   norad_id   INTEGER NOT NULL,
   nbf        INTEGER NOT NULL,
   exp        INTEGER NOT NULL,
-  receipt    TEXT NOT NULL
+  receipt    TEXT NOT NULL,
+  mandate    TEXT NOT NULL      -- the booked mandate JWS, for the pass session
+);
+CREATE TABLE IF NOT EXISTS counters (
+  name  TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS bookings_window ON bookings (nbf, exp);
 CREATE TABLE IF NOT EXISTS consumed_nonces (
@@ -111,11 +116,36 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(4)
-	if _, err := db.Exec(schemaSQL); err != nil {
+	if err := migrate(db, path); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("store: schema: %w", err)
+		return nil, err
 	}
 	return &Store{db: db, now: time.Now}, nil
+}
+
+// schemaVersion is bumped whenever a table changes shape.
+const schemaVersion = 3
+
+// migrate creates a fresh database at schemaVersion, and refuses one written
+// by an older build rather than failing later mid-query: this is demo state,
+// so the fix is to delete the file.
+func migrate(db *sql.DB, path string) error {
+	var v int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&v); err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+	var tables int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'`).Scan(&tables); err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+	if tables > 0 && v != schemaVersion {
+		return errs.New(errs.Unavailable, fmt.Sprintf("store %s has schema v%d, this build needs v%d: delete the file", path, v, schemaVersion))
+	}
+	if _, err := db.Exec(schemaSQL); err != nil {
+		return fmt.Errorf("store: schema: %w", err)
+	}
+	_, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion))
+	return err
 }
 
 // Close closes the database.
@@ -156,6 +186,7 @@ type Booking struct {
 	NoradID   int64
 	Nbf, Exp  int64
 	Receipt   string // station-signed BookingReceipt JWS
+	Mandate   string // the booked mandate JWS
 }
 
 // Book runs book_pass steps 11 and 12 and the insert in one immediate
@@ -193,14 +224,57 @@ func (s *Store) book(ctx context.Context, b Booking) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return errs.New(errs.MandateRejectedConsumed, "mandate nonce already used")
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO bookings (booking_id, quote_id, mandate_id, iss, nonce, norad_id, nbf, exp, receipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		b.BookingID, b.QuoteID, b.MandateID, b.Iss, b.Nonce, b.NoradID, b.Nbf, b.Exp, b.Receipt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO bookings (booking_id, quote_id, mandate_id, iss, nonce, norad_id, nbf, exp, receipt, mandate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		b.BookingID, b.QuoteID, b.MandateID, b.Iss, b.Nonce, b.NoradID, b.Nbf, b.Exp, b.Receipt, b.Mandate); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE quotes SET exp = MAX(exp, ?) WHERE quote_id = ?`, b.Exp, b.QuoteID); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// GetBooking returns one booking, or found=false.
+func (s *Store) GetBooking(ctx context.Context, id string) (b Booking, found bool, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT booking_id, quote_id, mandate_id, iss, nonce, norad_id, nbf, exp, receipt, mandate
+		FROM bookings WHERE booking_id = ?`, id).Scan(&b.BookingID, &b.QuoteID, &b.MandateID, &b.Iss, &b.Nonce,
+		&b.NoradID, &b.Nbf, &b.Exp, &b.Receipt, &b.Mandate)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Booking{}, false, nil
+	}
+	return b, err == nil, dbErr(err)
+}
+
+// NextCounter atomically increments and returns the named counter (Ops'
+// per-satellite command counter: it survives restarts and never repeats).
+func (s *Store) NextCounter(ctx context.Context, name string) (int64, error) {
+	var v int64
+	err := s.db.QueryRowContext(ctx, `INSERT INTO counters (name, value) VALUES (?, 1)
+		ON CONFLICT(name) DO UPDATE SET value = value + 1 RETURNING value`, name).Scan(&v)
+	return v, dbErr(err)
+}
+
+// Advance sets the named counter to v only if v is greater than its current
+// value (the spacecraft's last accepted counter), atomically. It reports
+// whether it advanced.
+func (s *Store) Advance(ctx context.Context, name string, v int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT INTO counters (name, value) VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET value = excluded.value WHERE counters.value < excluded.value`, name, v)
+	if err != nil {
+		return false, dbErr(err)
+	}
+	n, err := res.RowsAffected()
+	return n == 1, dbErr(err)
+}
+
+// Counter returns the named counter's value (0 if unset).
+func (s *Store) Counter(ctx context.Context, name string) (int64, error) {
+	var v int64
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM counters WHERE name = ?`, name).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return v, dbErr(err)
 }
 
 // Bookings returns the number of bookings (tests, dashboard).
