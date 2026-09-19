@@ -4,6 +4,7 @@ package errs
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -19,6 +20,65 @@ const (
 	Unavailable      Code = "unavailable"
 	Internal         Code = "internal"
 )
+
+// Protocol rejection codes from master plan sections 8, 9 and 10. The text
+// after ":" names which check failed.
+const (
+	// Any JWS whose typ is not the one the verifier expects (checked first).
+	TypRejected Code = "TYP_REJECTED"
+
+	// book_pass checks, in order (section 8.5).
+	MandateParseError        Code = "MANDATE_PARSE_ERROR"
+	MandateRejectedSignature Code = "MANDATE_REJECTED:signature"
+	MandateRejectedNotOwner  Code = "MANDATE_REJECTED:not_owner"
+	MandateRejectedAudience  Code = "MANDATE_REJECTED:audience"
+	MandateRejectedQuote     Code = "MANDATE_REJECTED:quote"
+	MandateRejectedScope     Code = "MANDATE_REJECTED:scope"
+	MandateRejectedAmount    Code = "MANDATE_REJECTED:amount"
+	MandateRejectedWindow    Code = "MANDATE_REJECTED:window"
+	DPoPRejectedKey          Code = "DPOP_REJECTED:key"
+	DPoPRejectedReplay       Code = "DPOP_REJECTED:replay"
+	BookingRejectedOverlap   Code = "BOOKING_REJECTED:overlap"
+	MandateRejectedConsumed  Code = "MANDATE_REJECTED:consumed"
+
+	// Pass session and audit (section 9).
+	WindowClosed   Code = "WINDOW_CLOSED"
+	ClassRejected  Code = "CLASS_REJECTED"
+	CanaryAccepted Code = "CANARY_ACCEPTED"
+	ChainMismatch  Code = "CHAIN_MISMATCH"
+	AckMissing     Code = "ACK_MISSING"
+
+	// Trust and cards (section 10).
+	PolicyRefusedTier Code = "POLICY_REFUSED:tier"
+	CardRejectedJKU   Code = "CARD_REJECTED:jku"
+	CardClaimMismatch Code = "CARD_CLAIM_MISMATCH"
+)
+
+// Per-object parse and signature codes for the other signed and wire objects.
+// The spacecraft's own checks (section 9.1) use the COMMAND_REJECTED family.
+const (
+	CommandParseError        Code = "COMMAND_PARSE_ERROR"
+	CommandRejectedSignature Code = "COMMAND_REJECTED:signature"
+	CommandRejectedNorad     Code = "COMMAND_REJECTED:norad_id"
+	CommandRejectedCounter   Code = "COMMAND_REJECTED:counter"
+	SatRegParseError         Code = "SATREG_PARSE_ERROR"
+	SatRegRejectedSignature  Code = "SATREG_REJECTED:signature"
+	AuditParseError          Code = "AUDIT_PARSE_ERROR"
+	AuditRejectedSignature   Code = "AUDIT_REJECTED:signature"
+	ReceiptParseError        Code = "RECEIPT_PARSE_ERROR"
+	ReceiptRejectedSignature Code = "RECEIPT_REJECTED:signature"
+	CardParseError           Code = "CARD_PARSE_ERROR"
+	CardRejectedSignature    Code = "CARD_REJECTED:signature"
+	QuoteParseError          Code = "QUOTE_PARSE_ERROR"
+	AckParseError            Code = "ACK_PARSE_ERROR"
+	RecordParseError         Code = "RECORD_PARSE_ERROR"
+)
+
+// Is reports whether err is an *Error carrying code.
+func Is(err error, code Code) bool {
+	var e *Error
+	return errors.As(err, &e) && e.Code == code
+}
 
 // Error is a rejection with a named code. It is also the JSON body.
 type Error struct {

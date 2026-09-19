@@ -19,8 +19,9 @@ run-local: build
 smoke:
 	scripts/smoke.sh
 
+# Every phase's acceptance script, in order.
 accept:
-	scripts/accept/phase-0.sh
+	@for f in scripts/accept/phase-*.sh; do echo "### $$f"; $$f || exit 1; done
 
 clean:
 	rm -rf bin .run

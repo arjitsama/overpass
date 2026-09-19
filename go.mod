@@ -4,6 +4,8 @@ go 1.25.0
 
 require (
 	github.com/agentnameservice/ans-sdk-go v0.1.18
+	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/gowebpki/jcs v1.0.1
 	go.yaml.in/yaml/v3 v3.0.4
 )
 

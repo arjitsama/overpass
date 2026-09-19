@@ -15,7 +15,7 @@ make test         # go test -race ./...
 make lint         # gofmt + go vet
 make run-local    # ops on :8443, gs-blacksburg station on :8444; Ctrl-C stops both
 make smoke        # in a second terminal: /health and /events checks
-make accept       # scripts/accept/phase-0.sh: starts, checks, stops
+make accept       # every scripts/accept/phase-N.sh in order
 ```
 
 Local agents make a throwaway self-signed cert in memory, so use `curl -k`:
@@ -50,6 +50,8 @@ Every rejection is JSON `{"code":...,"detail":...}` with a code from `internal/e
 ## Layout
 
 `cmd/agent` (the one binary), `cmd/battery` (attack battery, later),
-`internal/{config,errs,bus}` (working), `internal/{wellknown,a2a,verify,mandate,
-passes,planner,session}` (later phases), `web/` dashboard, `deploy/`,
-`scripts/accept/` per-phase acceptance, `docs/plans/` and `docs/status/`.
+`internal/{config,errs,bus}` (agent plumbing), `internal/{jose,schema,chain}`
+(wire formats and crypto; see `docs/schemas.md`, frozen after Phase 1),
+`internal/{wellknown,a2a,verify,mandate,passes,planner,session}` (later phases),
+`web/` dashboard, `deploy/`, `scripts/accept/` per-phase acceptance,
+`docs/plans/` and `docs/status/`.
