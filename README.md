@@ -91,6 +91,23 @@ Every rejection is JSON `{"code":...,"detail":...}` with a code from `internal/e
 - Environments (production and a local stack) and peers are listed in config under
   `environments` and `peers[{name,url,env,dial}]`.
 
+## Passes and planner
+
+```sh
+bin/passes                               # tonight's passes (next 24 h) for the configured satellite
+bin/passes -start 2026-09-20T00:00:00Z   # a fixed window (matches internal/passes/testdata/golden-passes.txt)
+bin/passes -demo-pass -json              # the next real pass replayed in a 90 s window starting now
+bin/passes -refresh-tle                  # fetch the current TLE from CelesTrak (only when asked)
+```
+
+- **Prediction.** `internal/passes` propagates with SGP4 (go-satellite) on a WGS84 observer:
+  10 s steps, AOS and LOS refined to 1 s, a 10° mask, and passes under 60 s dropped.
+  It was cross-checked against skyfield: 22 of 22 passes agree within 1 s.
+- **Planning.** `internal/planner` ranks passes by
+  `score = 100·max_el + 100·bonus − points_per_dollar·cents`. It schedules greedily without
+  overlaps and only on verified stations whose tier allows the mode. `Replan` emits a
+  before-and-after diff.
+
 ## Local ANS stack
 
 ```sh

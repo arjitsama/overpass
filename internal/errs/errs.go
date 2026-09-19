@@ -53,6 +53,15 @@ const (
 
 	// Trust and cards (section 10).
 	PolicyRefusedTier Code = "POLICY_REFUSED:tier"
+
+	// Planner reasons for passes it did not select.
+	PlanUnverified    Code = "PLAN_SKIPPED:unverified"
+	PlanNoQuote       Code = "PLAN_SKIPPED:no_quote"
+	PlanBadPrice      Code = "PLAN_SKIPPED:price"
+	PlanOverlap       Code = "PLAN_SKIPPED:overlap"
+	PlanGoalMet       Code = "PLAN_SKIPPED:goal_met"
+	PlanExcluded      Code = "PLAN_SKIPPED:replan"
+	PlanUnknownHost   Code = "PLAN_SKIPPED:unknown_station"
 	CardRejectedJKU   Code = "CARD_REJECTED:jku"
 	CardClaimMismatch Code = "CARD_CLAIM_MISMATCH"
 )

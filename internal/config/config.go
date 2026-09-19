@@ -55,6 +55,28 @@ type Environment struct {
 	InsecureHTTP bool     `yaml:"insecure_http"`  // allow http:// URLs (local stack only)
 }
 
+// Site is a ground station location for pass prediction.
+type Site struct {
+	Name   string  `yaml:"name"`
+	Host   string  `yaml:"host"`
+	LatDeg float64 `yaml:"lat"`
+	LonDeg float64 `yaml:"lon"`
+	AltM   float64 `yaml:"alt_m"`
+}
+
+// Satellite is the spacecraft Overpass plans for, with its cached TLE.
+type Satellite struct {
+	NoradID int64  `yaml:"norad_id"`
+	TLEFile string `yaml:"tle_file"`
+}
+
+// DefaultSites are the three stations of master plan 7.2.
+var DefaultSites = []Site{
+	{Name: "Blacksburg", Host: "gs-blacksburg", LatDeg: 37.23, LonDeg: -80.42, AltM: 634},
+	{Name: "Svalbard", Host: "gs-svalbard", LatDeg: 78.23, LonDeg: 15.41, AltM: 450},
+	{Name: "Awarua", Host: "gs-awarua", LatDeg: -46.53, LonDeg: 168.38, AltM: 10},
+}
+
 // ProdEnv is the environment name used when a peer names none.
 const ProdEnv = "prod"
 
@@ -104,6 +126,8 @@ type Config struct {
 	Identity     Identity               `yaml:"identity"`
 	Card         Card                   `yaml:"card"`
 	Peers        []Peer                 `yaml:"peers"`
+	Sites        []Site                 `yaml:"sites"`
+	Satellite    Satellite              `yaml:"satellite"`
 	Environments map[string]Environment `yaml:"environments"`
 	TrustRoots   []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
 	RegistryURL  string                 `yaml:"registry_url"`
@@ -197,6 +221,12 @@ func (c *Config) ApplyDefaults() {
 	if c.Card.DisplayName == "" {
 		c.Card.DisplayName = c.Host
 	}
+	if len(c.Sites) == 0 {
+		c.Sites = append([]Site(nil), DefaultSites...)
+	}
+	if c.Satellite.NoradID == 0 {
+		c.Satellite = Satellite{NoradID: 27844, TLEFile: "data/27844.tle"}
+	}
 	if c.Environments == nil {
 		c.Environments = map[string]Environment{}
 	}
@@ -236,6 +266,16 @@ func (c Config) Validate() error {
 		if err := checkHTTPSURL(u); err != nil {
 			return err
 		}
+	}
+	hosts := map[string]bool{}
+	for _, s := range c.Sites {
+		if s.Name == "" || s.Host == "" || s.LatDeg < -90 || s.LatDeg > 90 || s.LonDeg < -180 || s.LonDeg > 180 {
+			return errs.New(errs.BadRequest, fmt.Sprintf("site %q needs a name, a host and valid lat/lon", s.Name))
+		}
+		if hosts[s.Host] {
+			return errs.New(errs.BadRequest, "duplicate site host "+s.Host)
+		}
+		hosts[s.Host] = true
 	}
 	for name, e := range c.Environments {
 		if err := e.validate(name); err != nil {

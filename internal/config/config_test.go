@@ -54,6 +54,9 @@ func TestLoadValid(t *testing.T) {
 	if c.RegistryURL != DefaultRegistryURL || c.LogURL != DefaultLogURL {
 		t.Fatalf("defaults not applied: %+v", c)
 	}
+	if len(c.Sites) != 3 || c.Sites[1].Name != "Svalbard" || c.Satellite.NoradID != 27844 {
+		t.Fatalf("site defaults: %+v %+v", c.Sites, c.Satellite)
+	}
 	if c.PublicURL != "https://gs-blacksburg.localhost:8444" || c.Card.Version != "0.1.0" || !c.Card.Tier2On() {
 		t.Fatalf("card defaults: %+v", c)
 	}
@@ -123,6 +126,9 @@ func TestValidate(t *testing.T) {
 		"bad version":      func(c *Config) { c.Card.Version = "1.0" },
 		"dup skill":        func(c *Config) { c.Card.Skills = []Skill{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}} },
 		"http public url":  func(c *Config) { c.PublicURL = "http://x" },
+		"bad site lat":     func(c *Config) { c.Sites = []Site{{Name: "x", LatDeg: 91}} },
+		"unnamed site":     func(c *Config) { c.Sites = []Site{{LatDeg: 1}} },
+		"dup site host":    func(c *Config) { c.Sites = []Site{{Name: "a", Host: "h"}, {Name: "b", Host: "h"}} },
 		"public url path":  func(c *Config) { c.PublicURL = "https://localhost:8443/a2a" },
 		"public url query": func(c *Config) { c.PublicURL = "https://localhost:8443?x=1" },
 		"public url user":  func(c *Config) { c.PublicURL = "https://u@localhost:8443" },
