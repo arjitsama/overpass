@@ -1,0 +1,7 @@
+# Local ground station. No cert paths: the agent makes a throwaway self-signed cert.
+role: station
+host: gs-blacksburg.localhost
+port: 8444
+peers:
+  - name: ops
+    url: https://localhost:8443

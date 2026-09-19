@@ -1,0 +1,7 @@
+# Local Mission Ops. No cert paths: the agent makes a throwaway self-signed cert.
+role: ops
+host: ops.localhost
+port: 8443
+peers:
+  - name: gs-blacksburg
+    url: https://localhost:8444

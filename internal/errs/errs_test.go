@@ -1,0 +1,33 @@
+package errs
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func TestWriteBody(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Write(rec, http.StatusNotFound, NotFound, "no route /x")
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("content-type = %q", ct)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("body not JSON: %v", err)
+	}
+	if got["code"] != "not_found" || got["detail"] != "no route /x" || len(got) != 2 {
+		t.Fatalf("body = %v", got)
+	}
+}
+
+func TestErrorString(t *testing.T) {
+	if s := New(BadRequest, "bad port").Error(); s != "bad_request: bad port" {
+		t.Fatalf("Error() = %q", s)
+	}
+}
