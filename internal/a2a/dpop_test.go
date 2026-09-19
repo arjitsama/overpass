@@ -40,7 +40,7 @@ func TestDPoPGuardAcceptsProvenCaller(t *testing.T) {
 	var caller string
 	sec := Security{
 		HTTP:  []HTTPGuard{DPoPGuard(keys, pop.NewMemoryReplayCache(ctx, 100), "gs.example", quiet)},
-		Skill: map[string][]SkillGuard{"book_pass": {MandateGuard(func() []*ecdsa.PublicKey { return []*ecdsa.PublicKey{&authority.PublicKey} })}},
+		Skill: map[string][]SkillGuard{"book_pass": {MandateDeclared()}},
 	}
 	h := testServer(sec, map[string]Handler{
 		"get_pass_quote": func(ctx context.Context, _ json.RawMessage) (any, error) {
@@ -49,7 +49,19 @@ func TestDPoPGuardAcceptsProvenCaller(t *testing.T) {
 			}
 			return map[string]int{"amount_cents": 1200}, nil
 		},
-		"book_pass": func(context.Context, json.RawMessage) (any, error) {
+		// The real book_pass (internal/station) runs all mandate checks; this
+		// stand-in verifies the signature so the test sees the whole path.
+		"book_pass": func(_ context.Context, args json.RawMessage) (any, error) {
+			var a struct {
+				Mandate string `json:"mandate"`
+			}
+			_ = json.Unmarshal(args, &a)
+			if a.Mandate == "" {
+				return nil, errs.New(errs.MandateParseError, "mandate is missing")
+			}
+			if _, err := schema.VerifyMandate(a.Mandate, []*ecdsa.PublicKey{&authority.PublicKey}); err != nil {
+				return nil, err
+			}
 			return map[string]string{"booking_id": "b-1"}, nil
 		},
 	})

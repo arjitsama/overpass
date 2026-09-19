@@ -60,6 +60,11 @@ func TestLoadValid(t *testing.T) {
 	if c.PublicURL != "https://gs-blacksburg.localhost:8444" || c.Card.Version != "0.1.0" || !c.Card.Tier2On() {
 		t.Fatalf("card defaults: %+v", c)
 	}
+	r := Config{Role: "station", Host: "gs.example", Port: 443, Rogue: true, RogueAck: RogueAck}
+	r.ApplyDefaults()
+	if err := r.Validate(); err != nil {
+		t.Fatalf("acknowledged rogue station: %v", err)
+	}
 	d := Config{Role: "ops", Host: "ops.example", Port: 443, PublicURL: "https://ops.example/"}
 	d.ApplyDefaults()
 	if d.PublicURL != "https://ops.example" || d.Validate() != nil {
@@ -115,24 +120,26 @@ func TestValidate(t *testing.T) {
 	base := Config{Role: "ops", Port: 8443}
 	base.ApplyDefaults()
 	cases := map[string]func(*Config){
-		"bad role":         func(c *Config) { c.Role = "rogue" },
-		"port zero":        func(c *Config) { c.Port = 0 },
-		"port too big":     func(c *Config) { c.Port = 70000 },
-		"cert without key": func(c *Config) { c.Cert.CertFile = "a.pem" },
-		"http registry":    func(c *Config) { c.RegistryURL = "http://api.godaddy.com" },
-		"peer no name":     func(c *Config) { c.Peers = []Peer{{URL: "https://x"}} },
-		"peer bad url":     func(c *Config) { c.Peers = []Peer{{Name: "x", URL: "::"}} },
-		"identity half":    func(c *Config) { c.Identity.KeyFile = "k.pem" },
-		"bad version":      func(c *Config) { c.Card.Version = "1.0" },
-		"dup skill":        func(c *Config) { c.Card.Skills = []Skill{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}} },
-		"http public url":  func(c *Config) { c.PublicURL = "http://x" },
-		"bad site lat":     func(c *Config) { c.Sites = []Site{{Name: "x", LatDeg: 91}} },
-		"unnamed site":     func(c *Config) { c.Sites = []Site{{LatDeg: 1}} },
-		"dup site host":    func(c *Config) { c.Sites = []Site{{Name: "a", Host: "h"}, {Name: "b", Host: "h"}} },
-		"public url path":  func(c *Config) { c.PublicURL = "https://localhost:8443/a2a" },
-		"public url query": func(c *Config) { c.PublicURL = "https://localhost:8443?x=1" },
-		"public url user":  func(c *Config) { c.PublicURL = "https://u@localhost:8443" },
-		"public url host":  func(c *Config) { c.PublicURL = "https://evil.example:8443" },
+		"bad role":          func(c *Config) { c.Role = "rogue" },
+		"port zero":         func(c *Config) { c.Port = 0 },
+		"port too big":      func(c *Config) { c.Port = 70000 },
+		"cert without key":  func(c *Config) { c.Cert.CertFile = "a.pem" },
+		"http registry":     func(c *Config) { c.RegistryURL = "http://api.godaddy.com" },
+		"peer no name":      func(c *Config) { c.Peers = []Peer{{URL: "https://x"}} },
+		"peer bad url":      func(c *Config) { c.Peers = []Peer{{Name: "x", URL: "::"}} },
+		"identity half":     func(c *Config) { c.Identity.KeyFile = "k.pem" },
+		"bad version":       func(c *Config) { c.Card.Version = "1.0" },
+		"dup skill":         func(c *Config) { c.Card.Skills = []Skill{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}} },
+		"http public url":   func(c *Config) { c.PublicURL = "http://x" },
+		"bad site lat":      func(c *Config) { c.Sites = []Site{{Name: "x", LatDeg: 91}} },
+		"unnamed site":      func(c *Config) { c.Sites = []Site{{LatDeg: 1}} },
+		"dup site host":     func(c *Config) { c.Sites = []Site{{Name: "a", Host: "h"}, {Name: "b", Host: "h"}} },
+		"rogue without ack": func(c *Config) { c.Role = "station"; c.Rogue = true },
+		"rogue not station": func(c *Config) { c.Rogue = true; c.RogueAck = RogueAck },
+		"public url path":   func(c *Config) { c.PublicURL = "https://localhost:8443/a2a" },
+		"public url query":  func(c *Config) { c.PublicURL = "https://localhost:8443?x=1" },
+		"public url user":   func(c *Config) { c.PublicURL = "https://u@localhost:8443" },
+		"public url host":   func(c *Config) { c.PublicURL = "https://evil.example:8443" },
 	}
 	if err := base.Validate(); err != nil {
 		t.Fatalf("base invalid: %v", err)

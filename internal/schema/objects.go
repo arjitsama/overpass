@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/arjitsama/overpass/internal/errs"
+	"github.com/arjitsama/overpass/internal/jose"
 )
 
 // result returns *v only when err is nil, so a caller never holds a decoded
@@ -120,6 +121,23 @@ func SignMandate(m Mandate, key *ecdsa.PrivateKey) (string, error) {
 func VerifyMandate(token string, keys []*ecdsa.PublicKey) (Mandate, error) {
 	var m Mandate
 	return result(&m, verify(token, MandateProfile, keys, &m))
+}
+
+// PeekMandate runs book_pass step 1 (structure, typ, strict payload decode)
+// without checking the signature, and returns the claimed contents. They are
+// UNVERIFIED: use them only to choose the issuer's keys for VerifyMandate.
+func PeekMandate(token string) (Mandate, error) {
+	var m Mandate
+	_, err := jose.Verify(token, MandateProfile, nil, func(b []byte) error {
+		return decodeSigned(b, &m, errs.MandateParseError)
+	})
+	if errs.Is(err, errs.MandateRejectedSignature) {
+		return m, nil // parsed; only the (skipped) key lookup failed
+	}
+	if err == nil {
+		err = errs.New(errs.MandateParseError, "unexpected verification with no keys")
+	}
+	return Mandate{}, err
 }
 
 // Satellite is one entry in the satellite registry.

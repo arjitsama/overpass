@@ -40,6 +40,12 @@ const (
 
 var b64 = base64.RawURLEncoding.Strict()
 
+// B64Encode and B64Decode are the strict unpadded base64url used in JWS.
+func B64Encode(b []byte) string { return b64.EncodeToString(b) }
+
+// B64Decode decodes strict unpadded base64url.
+func B64Decode(s string) ([]byte, error) { return b64.DecodeString(s) }
+
 // Profile says what a verifier expects and which codes it rejects with.
 type Profile struct {
 	Typ       string
@@ -221,13 +227,13 @@ func check(segs [3][]byte, p Profile, keys []*ecdsa.PublicKey, decode func([]byt
 	if len(segs[2]) != es256SigLen {
 		return Header{}, errs.New(p.ParseCode, "missing or malformed ES256 signature")
 	}
-	if new(big.Int).SetBytes(segs[2][32:]).Cmp(halfOrder) > 0 {
-		return Header{}, errs.New(p.SigCode, "high-S signature (non-canonical)")
-	}
 	if decode != nil {
 		if err := decode(segs[1]); err != nil {
 			return Header{}, asCode(err, p.ParseCode)
 		}
+	}
+	if new(big.Int).SetBytes(segs[2][32:]).Cmp(halfOrder) > 0 {
+		return Header{}, errs.New(p.SigCode, "high-S signature (non-canonical)")
 	}
 	key := findKey(keys, h.Kid)
 	if key == nil {

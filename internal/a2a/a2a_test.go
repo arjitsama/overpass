@@ -18,7 +18,6 @@ import (
 	"github.com/agentnameservice/ans-sdk-go/verify/scitt"
 
 	"github.com/arjitsama/overpass/internal/errs"
-	"github.com/arjitsama/overpass/internal/schema"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -198,43 +197,23 @@ func newKey(t *testing.T) *ecdsa.PrivateKey {
 	return k
 }
 
-// The mandate guard runs before the handler and rejects with named codes.
-func TestMandateGuard(t *testing.T) {
-	authority := newKey(t)
-	var keys []*ecdsa.PublicKey
+// A skill guard with a nil Check is a declaration: the handler itself
+// enforces the scheme (book_pass keeps its twelve checks in one order), and a
+// guard with a Check runs before the handler and can reject it.
+func TestSkillGuards(t *testing.T) {
 	called := false
-	sec := Security{Skill: map[string][]SkillGuard{"book_pass": {MandateGuard(func() []*ecdsa.PublicKey { return keys })}}}
-	h := testServer(sec, map[string]Handler{"book_pass": func(context.Context, json.RawMessage) (any, error) {
-		called = true
-		return map[string]string{"ok": "yes"}, nil
-	}})
-	m := schema.Mandate{MandateID: "m-1", Iss: "authority.x", Sub: "ops.x", Aud: "gs.x", QuoteID: "q-1",
-		Scope: schema.Scope("uplink", 25544), CommandClasses: []string{"telemetry"}, MaxAmountCents: 1,
-		Nbf: 1760000000, Exp: 1760000480, JKT: strings.Repeat("A", 43), Nonce: "bm9uY2Utbm9uY2Utbm9uY2U"}
-	tok, _ := schema.SignMandate(m, authority)
-
-	for name, c := range map[string]struct {
-		extra string
-		keys  []*ecdsa.PublicKey
-		code  string
-	}{
-		"missing":       {"", nil, string(errs.MandateParseError)},
-		"garbage":       {`,"mandate":"x.y.z"`, nil, string(errs.MandateParseError)},
-		"no trust keys": {`,"mandate":"` + tok + `"`, nil, string(errs.MandateRejectedSignature)},
-		"wrong key":     {`,"mandate":"` + tok + `"`, []*ecdsa.PublicKey{&newKey(t).PublicKey}, string(errs.MandateRejectedSignature)},
-	} {
-		keys = c.keys
-		_, r := post(t, h, skillCall("book_pass", c.extra))
-		if r.Error == nil || r.Error.Code != CodeParams || len(r.Error.Data) != 1 || r.Error.Data[0].Reason != c.code {
-			t.Fatalf("%s: %+v", name, r.Error)
-		}
+	reject := SkillGuard{Scheme: Scheme{Name: "x"}, Check: func(context.Context, json.RawMessage) error {
+		return errs.New(errs.MandateParseError, "no")
+	}}
+	h := func(context.Context, json.RawMessage) (any, error) { called = true; return map[string]string{}, nil }
+	decl := testServer(Security{Skill: map[string][]SkillGuard{"book_pass": {MandateDeclared()}}}, map[string]Handler{"book_pass": h})
+	if _, r := post(t, decl, skillCall("book_pass", "")); r.Error != nil || !called {
+		t.Fatalf("declared guard blocked the handler: %+v", r.Error)
 	}
-	if called {
-		t.Fatal("handler ran despite guard rejection")
-	}
-	keys = []*ecdsa.PublicKey{&authority.PublicKey}
-	if _, r := post(t, h, skillCall("book_pass", `,"mandate":"`+tok+`"`)); r.Error != nil || !called {
-		t.Fatalf("valid mandate: %+v", r.Error)
+	called = false
+	checked := testServer(Security{Skill: map[string][]SkillGuard{"book_pass": {reject}}}, map[string]Handler{"book_pass": h})
+	if _, r := post(t, checked, skillCall("book_pass", "")); r.Error == nil || r.Error.Data[0].Reason != string(errs.MandateParseError) || called {
+		t.Fatalf("checking guard: %+v called=%v", r.Error, called)
 	}
 }
 

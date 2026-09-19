@@ -1,0 +1,238 @@
+// Package authority implements the mission authority's issue_mandate skill
+// (master plan 8.3, 8.4): verify the caller is an Ops agent, verify the
+// station, read its trust tier, apply the flight rules, sign the mandate.
+// Every refusal is POLICY_REFUSED:<rule>.
+package authority
+
+import (
+	"bytes"
+	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	ansverify "github.com/agentnameservice/ans-sdk-go/verify"
+
+	"github.com/arjitsama/overpass/internal/bus"
+	"github.com/arjitsama/overpass/internal/config"
+	"github.com/arjitsama/overpass/internal/errs"
+	"github.com/arjitsama/overpass/internal/jose"
+	"github.com/arjitsama/overpass/internal/planner"
+	"github.com/arjitsama/overpass/internal/schema"
+	"github.com/arjitsama/overpass/internal/station"
+	"github.com/arjitsama/overpass/internal/store"
+	"github.com/arjitsama/overpass/internal/verify"
+)
+
+// PeerVerifier is verify.Verifier's VerifyPeer.
+type PeerVerifier interface {
+	VerifyPeer(ctx context.Context, host string) verify.Result
+}
+
+// TrustSource returns a station's trust tier. StaticTrust stands in until
+// the trust index is wired (Phase 8).
+type TrustSource interface {
+	Tier(ctx context.Context, host string) (string, error)
+}
+
+// StaticTrust is a configured host -> tier map.
+type StaticTrust map[string]string
+
+// Tier implements TrustSource; an unknown host is READ_ONLY.
+func (s StaticTrust) Tier(_ context.Context, host string) (string, error) {
+	if t, ok := s[host]; ok {
+		return t, nil
+	}
+	return planner.TierReadOnly, nil
+}
+
+// Authority holds what issue_mandate needs.
+type Authority struct {
+	ANSName string
+	Key     *ecdsa.PrivateKey // identity key: signs mandates; published in the trust card
+	Rules   config.FlightRules
+	Ops     []string // ANS names allowed to request mandates
+	Peers   PeerVerifier
+	Trust   TrustSource
+	Store   *store.Store
+	Caller  station.CallerFunc
+	Emit    func(bus.Event)
+	Now     func() time.Time
+	Log     *slog.Logger
+}
+
+type issueArgs struct {
+	Skill          string          `json:"skill"`
+	Quote          json.RawMessage `json:"quote"`
+	CommandClasses []string        `json:"command_classes,omitempty"`
+}
+
+// IssueResult carries the signed mandate.
+type IssueResult struct {
+	Mandate string `json:"mandate"`
+}
+
+// IssueMandate signs a mandate for a quote, or refuses with POLICY_REFUSED:<rule>.
+func (a *Authority) IssueMandate(ctx context.Context, raw json.RawMessage) (out any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			a.Log.Error("issue_mandate panic", "panic", r)
+			out, err = nil, errs.New(errs.Internal, "issue_mandate failed")
+		}
+	}()
+	tok, q, err := a.issue(ctx, raw)
+	if err != nil {
+		var e *errs.Error
+		code := errs.Internal
+		if errors.As(err, &e) {
+			code = e.Code
+		}
+		a.emit("issue_mandate", q.Station, "refused", code, err)
+		return nil, err
+	}
+	a.emit("issue_mandate", q.Station, "ok", "", nil)
+	return IssueResult{Mandate: tok}, nil
+}
+
+func (a *Authority) emit(kind, subject, result string, code errs.Code, err error) {
+	if a.Emit == nil {
+		return
+	}
+	detail := ""
+	var e *errs.Error
+	if errors.As(err, &e) {
+		detail = e.Detail
+	}
+	a.Emit(bus.Event{Agent: a.ANSName, Kind: kind, Subject: subject, Result: result, Reason: string(code),
+		Data: map[string]any{"detail": detail}})
+}
+
+func (a *Authority) issue(ctx context.Context, raw json.RawMessage) (string, schema.Quote, error) {
+	var args issueArgs
+	if err := jose.StrictJSON(raw, schema.MaxObjectBytes); err != nil {
+		return "", schema.Quote{}, errs.New(errs.QuoteParseError, err.Error())
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&args); err != nil {
+		return "", schema.Quote{}, errs.New(errs.QuoteParseError, "arguments: "+err.Error())
+	}
+	q, err := schema.DecodeQuote(args.Quote)
+	if err != nil {
+		return "", schema.Quote{}, err
+	}
+	caller, ok := a.Caller(ctx)
+	if !ok || !contains(a.Ops, caller.ANSName) {
+		return "", q, errs.New(errs.PolicyRefusedCaller, "caller is not a configured Ops agent")
+	}
+	host, err := stationHost(q.Station)
+	if err != nil {
+		return "", q, errs.New(errs.PolicyRefusedStation, err.Error())
+	}
+	if res := a.Peers.VerifyPeer(ctx, host); !res.OK() || res.ANSName != q.Station {
+		return "", q, errs.New(errs.PolicyRefusedUnverified, fmt.Sprintf("station %s failed verification: %v", host, res.Failed()))
+	}
+	classes, err := a.checkPolicy(ctx, q, host, args.CommandClasses)
+	if err != nil {
+		return "", q, err
+	}
+	m := schema.Mandate{MandateID: "m-" + randomHex(12), Iss: a.ANSName, Sub: caller.ANSName, Aud: q.Station,
+		QuoteID: q.QuoteID, Scope: schema.Scope(q.Mode, q.NoradID), CommandClasses: classes,
+		MaxAmountCents: q.AmountCents, Nbf: q.AOS, Exp: q.LOS, JKT: caller.JKT, Nonce: randomB64("", 18)}
+	// max_passes_per_day counts mandates issued (an unused mandate still counts).
+	if _, err := a.Store.RecordMandate(ctx, m.MandateID, q.NoradID, q.AOS, host, a.Rules.MaxPassesPerDay); err != nil {
+		return "", q, err
+	}
+	tok, err := schema.SignMandate(m, a.Key)
+	return tok, q, err
+}
+
+// checkPolicy applies the flight rules and returns the command classes the
+// mandate will carry.
+func (a *Authority) checkPolicy(ctx context.Context, q schema.Quote, host string, requested []string) ([]string, error) {
+	now := a.Now().Unix()
+	if q.Exp <= now || q.LOS <= now {
+		return nil, errs.New(errs.PolicyRefusedWindow, "quote or pass is already over")
+	}
+	if len(a.Rules.Stations) > 0 && !contains(a.Rules.Stations, host) {
+		return nil, errs.New(errs.PolicyRefusedStation, host+" is not an allowed station")
+	}
+	tier, err := a.Trust.Tier(ctx, host)
+	if err != nil {
+		return nil, errs.New(errs.PolicyRefusedTier, "tier unavailable: "+err.Error())
+	}
+	if rank(tier) < rank(a.Rules.MinTier) {
+		return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("%s is %s, flight rules need %s", host, tier, a.Rules.MinTier))
+	}
+	if q.Mode == schema.ModeUplink && tier != planner.TierFiduciary {
+		return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("uplink needs FIDUCIARY; %s is %s", host, tier))
+	}
+	allowed := a.Rules.CommandClasses[q.Mode]
+	classes := requested
+	if len(classes) == 0 {
+		classes = allowed
+	}
+	if len(classes) == 0 {
+		return nil, errs.New(errs.PolicyRefusedClasses, "no command classes allowed for "+q.Mode)
+	}
+	for _, c := range classes {
+		if !contains(allowed, c) {
+			return nil, errs.New(errs.PolicyRefusedClasses, fmt.Sprintf("class %q not allowed for %s", c, q.Mode))
+		}
+	}
+	if a.Rules.MaxCentsPerPass > 0 && q.AmountCents > a.Rules.MaxCentsPerPass {
+		return nil, errs.New(errs.PolicyRefusedAmount, fmt.Sprintf("%d cents over the %d per-pass limit", q.AmountCents, a.Rules.MaxCentsPerPass))
+	}
+	if a.Rules.MaxPassesPerDay <= 0 {
+		return nil, errs.New(errs.PolicyRefusedDailyLimit, "flight rules allow no passes")
+	}
+	return classes, nil
+}
+
+func rank(tier string) int {
+	switch tier {
+	case planner.TierFiduciary:
+		return 3
+	case planner.TierTransactional:
+		return 2
+	case planner.TierReadOnly:
+		return 1
+	}
+	return 0
+}
+
+// stationHost extracts the host from a station's ANS name.
+func stationHost(ansName string) (string, error) {
+	n, err := ansverify.ParseAnsName(ansName)
+	if err != nil {
+		return "", fmt.Errorf("quote station %q is not an ANS name", ansName)
+	}
+	return n.Host, nil
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func randomB64(prefix string, n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return prefix + base64.RawURLEncoding.EncodeToString(b)
+}
+
+func contains(xs []string, s string) bool {
+	for _, x := range xs {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}

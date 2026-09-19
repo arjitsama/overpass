@@ -30,7 +30,7 @@ echo "== 2: verify via jku";             run ./internal/wellknown TestCardVerifi
                                          run ./cmd/agent TestServedCardVerifies
 echo "== 3: tamper";                     run ./internal/wellknown TestCardTamper
 echo "== 4: claims == mounted";          run ./cmd/agent TestStationCardMatchesMounted
-                                         run ./internal/a2a TestDPoPGuardRejectsUnauthenticated TestMandateGuard TestSecurityDeclarations
+                                         run ./internal/a2a TestDPoPGuardRejectsUnauthenticated TestSkillGuards TestSecurityDeclarations
 echo "== 5: JSON-RPC";                   run ./internal/a2a TestSendMessageListsSkills TestJSONRPCErrors TestSkillDispatchBothDialects
                                          run ./cmd/agent TestSendMessageOverHTTP
 echo "== 6: tier 2 off";                 run ./internal/wellknown TestTier2Off

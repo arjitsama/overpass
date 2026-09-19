@@ -77,6 +77,42 @@ var DefaultSites = []Site{
 	{Name: "Awarua", Host: "gs-awarua", LatDeg: -46.53, LonDeg: 168.38, AltM: 10},
 }
 
+// Pricing is how a station prices a pass and where it is paid (x402 shape).
+type Pricing struct {
+	PerMinuteCents int64  `yaml:"per_minute_cents"`
+	PayTo          string `yaml:"pay_to"`
+	Network        string `yaml:"network"`
+	Asset          string `yaml:"asset"`
+	AssetDecimals  int64  `yaml:"asset_decimals"` // accepts.amount = cents x 10^(decimals-2)
+}
+
+// SatReg is the station's signed satellite registry and its pinned signer.
+type SatReg struct {
+	File          string `yaml:"file"`
+	SignerKeyFile string `yaml:"signer_key_file"` // PEM public key
+}
+
+// AuthorityKey pins an authority's mandate-signing public key (PEM).
+type AuthorityKey struct {
+	ANSName string `yaml:"ans_name"`
+	KeyFile string `yaml:"key_file"`
+}
+
+// FlightRules is the authority's policy (master plan 8.3).
+type FlightRules struct {
+	Stations        []string            `yaml:"stations"` // allowed station hosts; empty = any meeting min_tier
+	MinTier         string              `yaml:"min_tier"`
+	CommandClasses  map[string][]string `yaml:"command_classes"` // mode -> allowed classes
+	MaxCentsPerPass int64               `yaml:"max_cents_per_pass"`
+	MaxPassesPerDay int                 `yaml:"max_passes_per_day"`
+}
+
+// MaxPerMinuteCents bounds a station's price ($10,000 a minute).
+const MaxPerMinuteCents = 1_000_000
+
+// RogueAck must accompany rogue: true, so a rogue station is never an accident.
+const RogueAck = "i-am-the-rogue-station"
+
 // ProdEnv is the environment name used when a peer names none.
 const ProdEnv = "prod"
 
@@ -118,20 +154,30 @@ func (c Card) Tier2On() bool { return c.Tier2 == nil || *c.Tier2 }
 
 // Config is one agent's configuration.
 type Config struct {
-	Role         string                 `yaml:"role"`
-	Host         string                 `yaml:"host"`
-	Port         int                    `yaml:"port"`
-	PublicURL    string                 `yaml:"public_url"`
-	Cert         Cert                   `yaml:"cert"`
-	Identity     Identity               `yaml:"identity"`
-	Card         Card                   `yaml:"card"`
-	Peers        []Peer                 `yaml:"peers"`
-	Sites        []Site                 `yaml:"sites"`
-	Satellite    Satellite              `yaml:"satellite"`
-	Environments map[string]Environment `yaml:"environments"`
-	TrustRoots   []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
-	RegistryURL  string                 `yaml:"registry_url"`
-	LogURL       string                 `yaml:"log_url"`
+	Role      string    `yaml:"role"`
+	Host      string    `yaml:"host"`
+	Port      int       `yaml:"port"`
+	PublicURL string    `yaml:"public_url"`
+	Cert      Cert      `yaml:"cert"`
+	Identity  Identity  `yaml:"identity"`
+	Card      Card      `yaml:"card"`
+	Peers     []Peer    `yaml:"peers"`
+	Sites     []Site    `yaml:"sites"`
+	Satellite Satellite `yaml:"satellite"`
+
+	DBPath        string                 `yaml:"db_path"`
+	Pricing       Pricing                `yaml:"pricing"`
+	SatReg        SatReg                 `yaml:"satreg"`
+	AuthorityKeys []AuthorityKey         `yaml:"authority_keys"`
+	OpsAgents     []string               `yaml:"ops_agents"`  // ANS names allowed to request mandates
+	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier, until Phase 8
+	FlightRules   FlightRules            `yaml:"flight_rules"`
+	Rogue         bool                   `yaml:"rogue"`
+	RogueAck      string                 `yaml:"rogue_ack"`
+	Environments  map[string]Environment `yaml:"environments"`
+	TrustRoots    []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
+	RegistryURL   string                 `yaml:"registry_url"`
+	LogURL        string                 `yaml:"log_url"`
 }
 
 // Load reads path, applies env overrides and defaults, and validates.
@@ -227,6 +273,12 @@ func (c *Config) ApplyDefaults() {
 	if c.Satellite.NoradID == 0 {
 		c.Satellite = Satellite{NoradID: 27844, TLEFile: "data/27844.tle"}
 	}
+	if c.DBPath == "" {
+		c.DBPath = "data/" + c.Host + "-" + strconv.Itoa(c.Port) + ".db"
+	}
+	if c.Pricing.AssetDecimals == 0 {
+		c.Pricing.AssetDecimals = 6
+	}
 	if c.Environments == nil {
 		c.Environments = map[string]Environment{}
 	}
@@ -266,6 +318,12 @@ func (c Config) Validate() error {
 		if err := checkHTTPSURL(u); err != nil {
 			return err
 		}
+	}
+	if c.Rogue && (c.Role != "station" || c.RogueAck != RogueAck) {
+		return errs.New(errs.BadRequest, "rogue: true needs role station and rogue_ack: "+RogueAck)
+	}
+	if c.Pricing.PerMinuteCents < 0 || c.Pricing.PerMinuteCents > MaxPerMinuteCents || c.Pricing.AssetDecimals < 2 || c.Pricing.AssetDecimals > 12 {
+		return errs.New(errs.BadRequest, fmt.Sprintf("pricing: per_minute_cents must be 0-%d and asset_decimals 2-12", MaxPerMinuteCents))
 	}
 	hosts := map[string]bool{}
 	for _, s := range c.Sites {

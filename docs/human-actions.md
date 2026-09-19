@@ -38,6 +38,12 @@ Tick an item (`[x]`) when it's done, and note when.
 
 - [ ] **Add `CALLER_REJECTED` to the codes table in `docs/schemas.md`.** The code is live in
   `internal/errs` and the DPoP guard. (Phase 2)
+- [ ] **Add the Phase 4–5 codes to that table.** All are live in `internal/errs`:
+  - `POLICY_REFUSED:{caller,unverified,station,classes,amount,daily_limit,window}`
+  - `QUOTE_REJECTED:{window,norad_id}`
+  - `PLAN_SKIPPED:*`
+
+  (Phase 4, 5)
 
 ## Decisions to confirm (Claude chose a default)
 
@@ -47,6 +53,10 @@ Tick an item (`[x]`) when it's done, and note when.
 - [ ] **Quote, Ack and CommandRecord are unsigned.** Risk: a station could forge Acks. Consider a
   spacecraft-signed Ack in Phase 5. (Phase 1)
 - [ ] **x402 `accepts[].amount` is an integer**, following rule 3. Real x402 uses a string. (Phase 1)
+- [ ] **book_pass check 10 (DPoP jti unseen) runs in the transport**, before the mandate is read. The SDK
+  doesn't expose the jti to handlers. The code is still `DPOP_REJECTED:replay`. (Phase 5)
+- [ ] **A mandate's own booking doesn't count as an overlap**, so replaying a spent mandate gets
+  `MANDATE_REJECTED:consumed` (attack 12), not overlap. (Phase 5)
 - [ ] **Skill call shape `{"skill": id, ...args}` in the A2A data part.** supplier.webmesh.ai's exact
   shape wasn't captured. (Phase 2)
 
@@ -60,6 +70,24 @@ Tick an item (`[x]`) when it's done, and note when.
   - uplink needs FIDUCIARY; downlink needs TRANSACTIONAL or better (master plan 11)
 
   (Phase 4)
+
+## Set up per deployment (Phase 5)
+
+- [ ] **Station pricing:** choose the real `pricing.pay_to` wallet, `network` and `asset` for each
+  station. It goes into the signed card's `x-payment`, so set it before freezing the card.
+- [ ] **Satellite registry:**
+  1. On the authority's host: `bin/satreg sign -key <authority identity key> -in registry.json -out registry.jws`
+     and `bin/satreg pubkey -key … -out signer.pub.pem`.
+  2. Give every station `satreg.file` and `satreg.signer_key_file`.
+  3. List the real Ops ANS name(s) under each NORAD ID.
+- [ ] **Authority flight rules:** confirm the values for `flight_rules` (stations or `min_tier`, command
+  classes per mode, `max_cents_per_pass`, `max_passes_per_day`), `ops_agents`, and `trust_tiers`.
+  `trust_tiers` is a stub until Phase 8.
+- [ ] **Authority keys on stations** are pinned statically (`authority_keys` PEM). Fetching them from
+  the authority's verified trust card is not wired yet; decide if the demo needs it.
+- [ ] **Flight rule `max_passes_per_day` counts mandates issued**, not passes booked. An unused mandate
+  still counts. Confirm or ask for release-on-expiry.
+- [ ] **Rogue station (demo):** `rogue: true` needs `rogue_ack: i-am-the-rogue-station`. Only on `gs-rogue`.
 
 ## Before the demo
 

@@ -80,7 +80,7 @@ func TestOutboundInboundAndReplay(t *testing.T) {
 	if code, _ := send(first); code != 200 {
 		t.Fatalf("first use: %d", code)
 	}
-	if code, body := send(replay); code != 401 || !bytes.Contains([]byte(body), []byte(errs.CallerRejected)) {
+	if code, body := send(replay); code != 401 || !bytes.Contains([]byte(body), []byte(errs.DPoPRejectedReplay)) {
 		t.Fatalf("replay: %d %s", code, body)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/arjitsama/overpass/internal/a2a"
@@ -28,8 +29,9 @@ type agent struct {
 	tls   *tls.Config
 	files wellknown.Files
 	sec   a2a.Security // what is mounted; the card is generated from it
+	role  role
 	rpc   http.Handler
-	stop  context.CancelFunc // ends background work (replay cache sweeper)
+	stop  func() // ends background work and closes the store
 }
 
 func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
@@ -45,26 +47,35 @@ func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
 		log.Warn("no identity configured; using a throwaway identity key (local only)")
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	sec, err := securityFor(ctx, cfg, log)
+	b := bus.New(bus.DefaultBacklog, bus.DefaultMaxSubs)
+	r, err := buildRole(ctx, cfg, id, b, log)
 	if err != nil {
 		stop()
 		return nil, err
 	}
-	files, err := wellknown.Build(wellknown.Input{Config: cfg, Identity: id, Security: sec})
+	files, err := wellknown.Build(wellknown.Input{Config: cfg, Identity: id, Security: r.sec})
 	if err != nil {
 		stop()
+		r.close()
 		return nil, err
 	}
 	return &agent{
 		cfg:   cfg,
-		bus:   bus.New(bus.DefaultBacklog, bus.DefaultMaxSubs),
+		bus:   b,
 		log:   log,
 		tls:   &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}},
 		files: files,
-		sec:   sec,
-		rpc:   a2aServer(cfg, sec, log).Handler(),
-		stop:  stop,
+		sec:   r.sec,
+		role:  r,
+		rpc:   a2aServer(cfg, r, log).Handler(),
+		stop:  onceFunc(func() { stop(); r.close() }),
 	}, nil
+}
+
+// onceFunc runs f at most once, whichever exit path calls it.
+func onceFunc(f func()) func() {
+	var once sync.Once
+	return func() { once.Do(f) }
 }
 
 func (a *agent) routes() http.Handler {

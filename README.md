@@ -108,6 +108,24 @@ bin/passes -refresh-tle                  # fetch the current TLE from CelesTrak 
   overlaps and only on verified stations whose tier allows the mode. `Replan` emits a
   before-and-after diff.
 
+## Booking (quote, mandate, book)
+
+- **Station `get_pass_quote {norad_id, aos, los, mode, max_elevation_deg}`.**
+  - Returns a Quote priced at `per_minute_cents` × whole minutes.
+  - It carries an x402 `accepts` block whose `payTo` equals the card's `x-payment.payTo`.
+  - It's valid for 10 minutes.
+- **Authority `issue_mandate {quote, command_classes?}`.**
+  - The caller must be in `ops_agents`, and the station must pass VerifyPeer and meet its tier
+    (uplink needs FIDUCIARY) and the `flight_rules`.
+  - Returns an `overpass-mandate+jws` bound to the caller's DPoP key.
+  - Refusals are `POLICY_REFUSED:<rule>`.
+- **Station `book_pass {quote_id, mandate}`.**
+  - Runs master plan 8.5's checks in order, each with its own code.
+  - Books with the overlap check and nonce consumption in one SQLite transaction.
+  - Returns a station-signed `overpass-receipt+jws`.
+- **Satellite registry.** `bin/satreg sign|pubkey` signs the registry that stations pin
+  (`satreg.file`, `satreg.signer_key_file`).
+
 ## Local ANS stack
 
 ```sh

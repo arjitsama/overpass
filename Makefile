@@ -3,7 +3,7 @@
 BIN := bin/agent
 
 build:
-	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes
+	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg
 
 test:
 	go test -race ./...

@@ -102,7 +102,7 @@ func TestStationCardMatchesMounted(t *testing.T) {
 	}
 	// Claimed mandate is enforced on book_pass: the same skill guards the
 	// server mounted reject a call without one (DPoP bypassed here only).
-	inner := a2a.NewServer("x", []a2a.SkillInfo{{ID: "book_pass"}}, nil, a2a.Security{Skill: r.agent.sec.Skill}, quiet).Handler()
+	inner := a2a.NewServer("x", []a2a.SkillInfo{{ID: "book_pass"}}, r.agent.role.handlers, a2a.Security{Skill: r.agent.sec.Skill}, quiet).Handler()
 	rec := &recorder{header: http.Header{}}
 	req, _ := http.NewRequest(http.MethodPost, "/", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m","role":"ROLE_USER","parts":[{"data":{"skill":"book_pass"}}]}}}`))
 	inner.ServeHTTP(rec, req)

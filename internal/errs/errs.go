@@ -54,6 +54,19 @@ const (
 	// Trust and cards (section 10).
 	PolicyRefusedTier Code = "POLICY_REFUSED:tier"
 
+	// Authority flight-rule refusals (issue_mandate).
+	PolicyRefusedCaller     Code = "POLICY_REFUSED:caller"
+	PolicyRefusedUnverified Code = "POLICY_REFUSED:unverified"
+	PolicyRefusedStation    Code = "POLICY_REFUSED:station"
+	PolicyRefusedClasses    Code = "POLICY_REFUSED:classes"
+	PolicyRefusedAmount     Code = "POLICY_REFUSED:amount"
+	PolicyRefusedDailyLimit Code = "POLICY_REFUSED:daily_limit"
+	PolicyRefusedWindow     Code = "POLICY_REFUSED:window"
+
+	// Station quote refusals (get_pass_quote).
+	QuoteRejectedWindow Code = "QUOTE_REJECTED:window"
+	QuoteRejectedNorad  Code = "QUOTE_REJECTED:norad_id"
+
 	// Planner reasons for passes it did not select.
 	PlanUnverified    Code = "PLAN_SKIPPED:unverified"
 	PlanNoQuote       Code = "PLAN_SKIPPED:no_quote"
@@ -85,6 +98,9 @@ const (
 	AckParseError            Code = "ACK_PARSE_ERROR"
 	RecordParseError         Code = "RECORD_PARSE_ERROR"
 )
+
+// As is errors.As, re-exported so callers need one import.
+func As(err error, target any) bool { return errors.As(err, target) }
 
 // Is reports whether err is an *Error carrying code.
 func Is(err error, code Code) bool {

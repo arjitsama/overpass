@@ -24,7 +24,8 @@ type HTTPGuard struct {
 }
 
 // SkillGuard is a scheme enforced on one skill's arguments before its handler
-// runs. It returns an *errs.Error to reject.
+// runs. It returns an *errs.Error to reject. A nil Check means the handler
+// enforces the scheme itself.
 type SkillGuard struct {
 	Scheme Scheme
 	Check  func(ctx context.Context, args json.RawMessage) error

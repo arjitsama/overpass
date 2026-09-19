@@ -228,6 +228,9 @@ func (s *Server) call(ctx context.Context, skill string, args json.RawMessage, v
 		return nil, &rpcError{Code: CodeParams, Message: "Invalid parameters: unknown skill " + truncate(skill, 64)}
 	}
 	for _, g := range s.sec.Skill[skill] {
+		if g.Check == nil {
+			continue // declared here, enforced by the handler
+		}
 		if err := g.Check(ctx, args); err != nil {
 			return nil, rejection(err)
 		}

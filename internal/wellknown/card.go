@@ -41,7 +41,17 @@ type agentCard struct {
 	XIdentity            xIdentity             `json:"x-identity"`
 	XDiscovery           xDiscovery            `json:"x-discovery"`
 	XSecurityNote        string                `json:"x-security-note"`
+	XPayment             *xPayment             `json:"x-payment,omitempty"`
 	Signatures           []signature           `json:"signatures,omitempty"`
+}
+
+// xPayment is where a station is paid. Quotes carry the same payTo in their
+// x402-shaped accepts block (master plan 8.2).
+type xPayment struct {
+	Scheme  string `json:"scheme"`
+	PayTo   string `json:"payTo"`
+	Network string `json:"network,omitempty"`
+	Asset   string `json:"asset,omitempty"`
 }
 
 type provider struct {
@@ -176,6 +186,9 @@ func (b builder) unsignedCard() agentCard {
 		XIdentity:          xIdentity{ANS: xANS{URI: ANSName(c), TrustCard: b.url(PathTrustCard), TransparencyLog: c.Card.TLAgentURL}},
 		XDiscovery:         b.discovery(),
 		XSecurityNote:      "This card declares only what the agent enforces: " + b.accessSummary() + ".",
+	}
+	if c.Role == "station" && c.Pricing.PayTo != "" {
+		card.XPayment = &xPayment{Scheme: "exact", PayTo: c.Pricing.PayTo, Network: c.Pricing.Network, Asset: c.Pricing.Asset}
 	}
 	if c.Card.OrgName != "" {
 		card.Provider = &provider{Organization: c.Card.OrgName, URL: c.Card.OrgURL}
