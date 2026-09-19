@@ -1,9 +1,18 @@
-.PHONY: build test lint run-local smoke accept clean
+.PHONY: build test lint run-local smoke accept clean trust-up trust-down
 
 BIN := bin/agent
+TRUST_DIR := third_party/agent-trust-discovery
 
 build:
-	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery
+	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery ./cmd/trustseed
+
+# Start the forked trust index locally on :8080 (admin auth off for the demo).
+trust-up:
+	@mkdir -p $(TRUST_DIR)/data
+	cd $(TRUST_DIR) && go run ./cmd/agent-trust-discovery -config config/overpass-local.runtime.yaml
+
+trust-down:
+	@pkill -f 'agent-trust-discovery -config' || true
 
 test:
 	go test -race ./...

@@ -130,6 +130,25 @@ Tick an item (`[x]`) when it's done, and note when.
   Wire it into the deploy so a vulnerable station cannot ship. Use `-expect-vulnerable` only for the
   rogue demo.
 
+## Phase 8 (trust index and tiers)
+
+- [ ] **Run the trust index.** `make trust-up` runs the fork on `:8080` with admin auth OFF (local
+  demo only; it logs a loud warning). For anything shared, run it with the shipped
+  `config/runtime.yaml` and a real bearer key, and set `trust_index.admin_key_env` on the authority
+  and auditor configs to the env var holding that key. Never put the key in a config file (hard rule 2).
+- [ ] **Register + seed.** `bin/trustseed -config deploy/local/trustseed.yaml` imports the seven agents
+  and gives the honest stations a baseline `pass_delivery` marked as seed data. It never seeds identity
+  or integrity. The lookalike is imported but not seeded (that is why it stays downlink-probation).
+- [ ] **Real integrity/identity (the one thing the local stack cannot fake).** The upstream engine
+  derives identity from `certtype` alone (DV=40) and integrity from DNSSEC/cert/version signals. On the
+  local stack these have no source, so a seeded honest station reads Overpass READ_ONLY. To demo
+  downlink/uplink for real, run the prober/hydrator (or `QUERY=webmesh make demo-live` in the fork)
+  against real infrastructure so integrity/identity are measured. See `docs/status/phase-8.md` for the
+  file:line references on why DV cannot reach the index's FIDUCIARY.
+- [ ] **Set `flight_rules.min_cert_type`** to `OV` or `EV` for production uplink (default `DV` for the
+  demo). Identity is displayed as measured; this is the only cert gate.
+- [ ] **`make demo-live` against production** is out of scope for Phase 8; a human runs it separately.
+
 ## Before the demo
 
 - [ ] **Refresh the TLE** a day or two before judging: `bin/passes -refresh-tle`. It reads CelesTrak

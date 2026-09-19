@@ -100,7 +100,7 @@ func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b 
 		return r, err
 	}
 	au := &authority.Authority{ANSName: wellknown.ANSName(cfg), Key: id.Key, Rules: cfg.FlightRules, Ops: cfg.OpsAgents,
-		Peers: v, Trust: authority.StaticTrust(cfg.TrustTiers), Store: db, Caller: station.PopCaller,
+		Peers: v, Trust: trustSource(cfg), Store: db, Caller: station.PopCaller,
 		Emit: emit, Now: time.Now, Log: log}
 	r.handlers["issue_mandate"] = au.IssueMandate
 	return r, nil

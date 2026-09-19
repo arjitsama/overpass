@@ -65,7 +65,17 @@ type Auditor struct {
 	AuthorityKeys []*ecdsa.PublicKey // to verify mandates
 	StationKeys   func(host string) []*ecdsa.PublicKey
 	Sink          TrustSink
+	Emit          func(bus.Event) // optional: warns when a trust-index post fails
 	Now           func() time.Time
+}
+
+// post sends an observation to the trust sink, surfacing (not swallowing) a
+// failure as a warning event so a down index is visible rather than silent.
+func (a *Auditor) post(ctx context.Context, o Observation) {
+	if err := a.Sink.Post(ctx, o); err != nil && a.Emit != nil {
+		a.Emit(bus.Event{Agent: o.Station, Kind: "trust_post_failed", Subject: o.PassID, Result: "warning",
+			Reason: err.Error()})
+	}
 }
 
 func (a *Auditor) now() time.Time {
@@ -127,7 +137,7 @@ func (a *Auditor) Audit(ctx context.Context, stationHost, stationANS, passID str
 				fails++
 			}
 		}
-		_ = a.Sink.Post(ctx, Observation{Station: stationANS, PassID: passID, Verdict: rep.Verdict, AuditFailures: fails})
+		a.post(ctx, Observation{Station: stationANS, PassID: passID, Verdict: rep.Verdict, AuditFailures: fails})
 	}
 	return rep, tok, nil
 }
@@ -195,7 +205,7 @@ func (a *Auditor) canaryReport(ctx context.Context, passID, stationANS string, p
 		return schema.AuditReport{}, "", err
 	}
 	if a.Sink != nil {
-		_ = a.Sink.Post(ctx, Observation{Station: stationANS, PassID: rep.PassID, Verdict: rep.Verdict, AuditFailures: fails})
+		a.post(ctx, Observation{Station: stationANS, PassID: rep.PassID, Verdict: rep.Verdict, AuditFailures: fails})
 	}
 	return rep, tok, nil
 }

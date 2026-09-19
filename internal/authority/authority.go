@@ -35,21 +35,82 @@ type PeerVerifier interface {
 	VerifyPeer(ctx context.Context, host string) verify.Result
 }
 
-// TrustSource returns a station's trust tier. StaticTrust stands in until
-// the trust index is wired (Phase 8).
-type TrustSource interface {
-	Tier(ctx context.Context, host string) (string, error)
+// TrustEval is the truthful trust vector Overpass reads from the trust index for
+// one station, plus the two derived facts the flight rules gate on: whether any
+// audited pass failed, and how many passes the auditor has recorded. Overpass
+// computes its own access tiers from these (OverpassTier); it does not gate on
+// the index's own recommendedProfile, which is displayed as the index's verdict.
+type TrustEval struct {
+	Integrity     int
+	Identity      int
+	Behavior      int
+	Solvency      int
+	Safety        int
+	AuditFailures bool   // a BEHAVIOR_AUDIT_FAILURE risk factor is present
+	AuditedPasses int    // booked passes recorded by pass_delivery
+	CertType      string // "none" | "DV" | "OV" | "EV", as measured; displayed, not fabricated
+
+	// RecommendedProfile is the index's OWN tier verdict. Overpass does not gate
+	// on it (it gates on the vector above via OverpassTier); it is surfaced only
+	// to display the index's verdict beside Overpass's own (master plan §11).
+	RecommendedProfile string
 }
 
-// StaticTrust is a configured host -> tier map.
+// TrustSource returns a station's truthful trust evaluation from the index.
+type TrustSource interface {
+	Evaluate(ctx context.Context, host string) (TrustEval, error)
+}
+
+// OverpassTier maps a truthful trust evaluation to an Overpass access tier using
+// the flight rules' thresholds (master plan §11, revised: Overpass gates on the
+// real vector, not the index's recommendedProfile). Uplink (FIDUCIARY) demands
+// integrity, behavior, a minimum audited-pass count, no audit failures, and a
+// minimum cert tier; downlink (TRANSACTIONAL) demands integrity and no audit
+// failures, with a cold-start behavior of 0 allowed as probation so a new
+// station can earn history; everything verified else is READ_ONLY availability.
+func OverpassTier(e TrustEval, r config.FlightRules) string {
+	if !e.AuditFailures &&
+		e.Integrity >= r.UplinkIntegrity() &&
+		e.Behavior >= r.UplinkBehavior() &&
+		e.AuditedPasses >= r.UplinkPasses() &&
+		certRank(e.CertType) >= certRank(r.CertTypeFloor()) {
+		return planner.TierFiduciary
+	}
+	if !e.AuditFailures && e.Integrity >= r.DownlinkIntegrity() {
+		return planner.TierTransactional
+	}
+	return planner.TierReadOnly
+}
+
+// certRank orders certificate tiers; an unknown/empty value ranks below DV.
+func certRank(t string) int {
+	switch t {
+	case "EV":
+		return 3
+	case "OV":
+		return 2
+	case "DV":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// StaticTrust is a configured host -> tier map used for tests and for a local
+// run without the index. It implements TrustSource by returning a synthetic
+// evaluation that OverpassTier maps back to the configured tier.
 type StaticTrust map[string]string
 
-// Tier implements TrustSource; an unknown host is READ_ONLY.
-func (s StaticTrust) Tier(_ context.Context, host string) (string, error) {
-	if t, ok := s[host]; ok {
-		return t, nil
+// Evaluate implements TrustSource; an unknown host is READ_ONLY.
+func (s StaticTrust) Evaluate(_ context.Context, host string) (TrustEval, error) {
+	switch s[host] {
+	case planner.TierFiduciary:
+		return TrustEval{Integrity: 100, Behavior: 100, AuditedPasses: 1 << 20, CertType: "EV"}, nil
+	case planner.TierTransactional:
+		return TrustEval{Integrity: 100, CertType: "DV"}, nil
+	default:
+		return TrustEval{}, nil
 	}
-	return planner.TierReadOnly, nil
 }
 
 // Authority holds what issue_mandate needs.
@@ -163,15 +224,20 @@ func (a *Authority) checkPolicy(ctx context.Context, q schema.Quote, host string
 	if len(a.Rules.Stations) > 0 && !contains(a.Rules.Stations, host) {
 		return nil, errs.New(errs.PolicyRefusedStation, host+" is not an allowed station")
 	}
-	tier, err := a.Trust.Tier(ctx, host)
+	eval, err := a.Trust.Evaluate(ctx, host)
 	if err != nil {
-		return nil, errs.New(errs.PolicyRefusedTier, "tier unavailable: "+err.Error())
+		// Fail closed: with no trustworthy read of the station, refuse rather
+		// than sign against a stale or absent tier (master plan §11).
+		return nil, errs.New(errs.PolicyRefusedTier, "trust index unavailable: "+err.Error())
 	}
+	tier := OverpassTier(eval, a.Rules)
 	if rank(tier) < rank(a.Rules.MinTier) {
 		return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("%s is %s, flight rules need %s", host, tier, a.Rules.MinTier))
 	}
 	if q.Mode == schema.ModeUplink && tier != planner.TierFiduciary {
-		return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("uplink needs FIDUCIARY; %s is %s", host, tier))
+		return nil, errs.New(errs.PolicyRefusedTier,
+			fmt.Sprintf("uplink needs FIDUCIARY; %s is %s (integrity %d, behavior %d, %d audited passes, audit_failures=%v)",
+				host, tier, eval.Integrity, eval.Behavior, eval.AuditedPasses, eval.AuditFailures))
 	}
 	allowed := a.Rules.CommandClasses[q.Mode]
 	classes := requested

@@ -6,9 +6,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -186,5 +188,52 @@ func TestLookalikeVerifiesButNoUplink(t *testing.T) {
 	_, err := f.issue(f.ctx, quote("gs-svalbard-eu.example", schema.ModeUplink, 1200))
 	if !errs.Is(err, errs.PolicyRefusedTier) {
 		t.Fatalf("uplink for the lookalike: %v", err)
+	}
+}
+
+// errTrust is a TrustSource that always fails, standing in for an unreachable
+// trust index.
+type errTrust struct{}
+
+func (errTrust) Evaluate(context.Context, string) (TrustEval, error) {
+	return TrustEval{}, fmt.Errorf("dial tcp 127.0.0.1:8080: connect: connection refused")
+}
+
+// Acceptance 5 (phase 8): with the trust index down, the authority fails closed
+// — it refuses the uplink mandate with POLICY_REFUSED:tier and names the index.
+func TestFailsClosedWhenIndexDown(t *testing.T) {
+	f := newFixture(t)
+	f.a.Trust = errTrust{}
+	_, err := f.issue(f.ctx, quote("gs-blacksburg.example", schema.ModeUplink, 1200))
+	if !errs.Is(err, errs.PolicyRefusedTier) {
+		t.Fatalf("err = %v, want POLICY_REFUSED:tier", err)
+	}
+	var e *errs.Error
+	if !errs.As(err, &e) || !strings.Contains(e.Error(), "trust index unavailable") {
+		t.Fatalf("refusal should name the index: %v", err)
+	}
+}
+
+// OverpassTier maps truthful vectors to Overpass access tiers (master plan §11).
+func TestOverpassTier(t *testing.T) {
+	var r config.FlightRules // zero → documented defaults (downlink 50, uplink 80/80/3, DV)
+	cases := []struct {
+		name string
+		e    TrustEval
+		want string
+	}{
+		{"cold start: no history is probation, not untrusted", TrustEval{}, planner.TierReadOnly},
+		{"integrity earns downlink", TrustEval{Integrity: 60, CertType: "DV"}, planner.TierTransactional},
+		{"behavior 0 stays downlink", TrustEval{Integrity: 90, Behavior: 0, AuditedPasses: 5, CertType: "EV"}, planner.TierTransactional},
+		{"too few passes stays downlink", TrustEval{Integrity: 90, Behavior: 90, AuditedPasses: 2, CertType: "EV"}, planner.TierTransactional},
+		{"full history earns uplink", TrustEval{Integrity: 90, Behavior: 90, AuditedPasses: 3, CertType: "DV"}, planner.TierFiduciary},
+		{"an audit failure drops everything", TrustEval{Integrity: 90, Behavior: 40, AuditedPasses: 5, AuditFailures: true, CertType: "EV"}, planner.TierReadOnly},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := OverpassTier(c.e, r); got != c.want {
+				t.Errorf("OverpassTier = %s, want %s", got, c.want)
+			}
+		})
 	}
 }

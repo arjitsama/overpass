@@ -63,9 +63,15 @@ func auditorRole(cfg config.Config, id wellknown.Identity, b *bus.Bus, log *slog
 		}
 		authKeys = append(authKeys, pub)
 	}
+	// Post pass_delivery to the trust index when one is configured; otherwise
+	// fall back to emitting the observation as a bus event.
+	var sink auditor.TrustSink = auditor.LogSink{Emit: func(e bus.Event) { _, _ = b.Publish(e) }}
+	if tc := newTrustClient(cfg); tc != nil {
+		sink = tc
+	}
 	au := &auditor.Auditor{ANSName: wellknown.ANSName(cfg), Key: id.Key, Peers: v, AuthorityKeys: authKeys,
 		StationKeys: func(host string) []*ecdsa.PublicKey { return stationKeys[host] },
-		Sink:        auditor.LogSink{Emit: func(e bus.Event) { _, _ = b.Publish(e) }}, Now: time.Now}
+		Sink:        sink, Emit: func(e bus.Event) { _, _ = b.Publish(e) }, Now: time.Now}
 	r.handlers["audit_pass"] = func(ctx context.Context, raw json.RawMessage) (any, error) {
 		var in struct {
 			Skill       string `json:"skill"`

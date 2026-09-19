@@ -1,0 +1,19 @@
+# Seed config for the local trust index (make trust-up). Imports the seven
+# Overpass agents and gives the honest stations a baseline pass_delivery,
+# marked as seed data. The lookalike (gs-svalbard-eu) is imported but NOT
+# seeded, so it stays downlink-probation. Identity and integrity are never
+# seeded here: production fills them from the prober/hydrator.
+url: http://127.0.0.1:8080
+admin_key_env: TRUST_ADMIN_KEY   # empty for the local demo (admin auth off)
+seed_passes: 3
+agents:
+  - {agent_id: gs-blacksburg,   dns_name: gs-blacksburg.example.com,   display_name: "Blacksburg GS",  first_seen: 2026-04-01T00:00:00Z}
+  - {agent_id: gs-awarua,       dns_name: gs-awarua.example.com,       display_name: "Awarua GS",      first_seen: 2026-04-01T00:00:00Z}
+  - {agent_id: gs-svalbard-eu,  dns_name: gs-svalbard-eu.example.com,  display_name: "Svalbard EU GS (lookalike)", first_seen: 2026-09-10T00:00:00Z}
+  - {agent_id: gs-rogue,        dns_name: gs-rogue.example.com,        display_name: "Rogue GS",       first_seen: 2026-04-01T00:00:00Z}
+  - {agent_id: overpass-ops,    dns_name: ops.example.com,             display_name: "Overpass Ops",   first_seen: 2026-04-01T00:00:00Z}
+  - {agent_id: overpass-authority, dns_name: authority.example.com,    display_name: "Mission Authority", first_seen: 2026-04-01T00:00:00Z}
+  - {agent_id: overpass-auditor, dns_name: auditor.example.com,        display_name: "Overpass Auditor", first_seen: 2026-04-01T00:00:00Z}
+seed_stations:
+  - gs-blacksburg
+  - gs-awarua

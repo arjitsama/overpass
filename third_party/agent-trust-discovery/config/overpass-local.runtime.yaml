@@ -1,0 +1,25 @@
+# Overpass local-demo runtime config for `make trust-up` (third_party/PATCHES.md).
+# It sits beside default-profile.yaml + profiles/ so those resolve. The only
+# difference from the shipped runtime.yaml is admin.requireKey: false, which the
+# upstream config explicitly sanctions "for demos" (the binary logs a loud
+# per-request warning). A real deploy uses the shipped runtime.yaml with a
+# bearer key supplied out of band. Classify thresholds are upstream-identical;
+# Overpass gates on the trust vector in its own flight rules, not on these.
+listen:
+  addr: ":8080"
+
+db:
+  path: "data/trust-index.db"
+
+admin:
+  requireKey: false
+  key: ""
+
+log:
+  level: info
+
+classify:
+  untrustedThreshold: 20
+  transactionalThreshold: 50
+  fiduciaryThreshold: 80
+  identityFiduciaryThreshold: 90

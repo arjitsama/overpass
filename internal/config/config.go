@@ -98,6 +98,16 @@ type AuthorityKey struct {
 	KeyFile string `yaml:"key_file"`
 }
 
+// TrustIndexCfg points an authority or auditor at the trust index. AdminKeyEnv
+// names the environment variable holding the bearer key for /v1/internal/*
+// (never the key itself: hard rule 2). An empty URL means "no index configured":
+// the authority then falls back to trust_tiers and the auditor to a log sink.
+type TrustIndexCfg struct {
+	URL         string            `yaml:"url"`
+	AdminKeyEnv string            `yaml:"admin_key_env"`
+	Agents      map[string]string `yaml:"agents"` // station host -> index agentId
+}
+
 // FlightRules is the authority's policy (master plan 8.3).
 type FlightRules struct {
 	Stations        []string            `yaml:"stations"` // allowed station hosts; empty = any meeting min_tier
@@ -105,6 +115,51 @@ type FlightRules struct {
 	CommandClasses  map[string][]string `yaml:"command_classes"` // mode -> allowed classes
 	MaxCentsPerPass int64               `yaml:"max_cents_per_pass"`
 	MaxPassesPerDay int                 `yaml:"max_passes_per_day"`
+
+	// Overpass access-tier thresholds, computed from the truthful trust vector
+	// (master plan §11, revised). Zero values fall back to the documented
+	// defaults below, so an operator sets only what they want to change.
+	DownlinkMinIntegrity int    `yaml:"downlink_min_integrity"` // default 50
+	UplinkMinIntegrity   int    `yaml:"uplink_min_integrity"`   // default 80
+	UplinkMinBehavior    int    `yaml:"uplink_min_behavior"`    // default 80
+	UplinkMinPasses      int    `yaml:"uplink_min_passes"`      // default 3
+	MinCertType          string `yaml:"min_cert_type"`          // default "DV"; production would set "OV"/"EV"
+}
+
+// Threshold accessors apply the documented defaults for an unset (zero) field.
+func (r FlightRules) DownlinkIntegrity() int {
+	if r.DownlinkMinIntegrity > 0 {
+		return r.DownlinkMinIntegrity
+	}
+	return 50
+}
+
+func (r FlightRules) UplinkIntegrity() int {
+	if r.UplinkMinIntegrity > 0 {
+		return r.UplinkMinIntegrity
+	}
+	return 80
+}
+
+func (r FlightRules) UplinkBehavior() int {
+	if r.UplinkMinBehavior > 0 {
+		return r.UplinkMinBehavior
+	}
+	return 80
+}
+
+func (r FlightRules) UplinkPasses() int {
+	if r.UplinkMinPasses > 0 {
+		return r.UplinkMinPasses
+	}
+	return 3
+}
+
+func (r FlightRules) CertTypeFloor() string {
+	if r.MinCertType != "" {
+		return r.MinCertType
+	}
+	return "DV"
 }
 
 // SpacecraftCfg configures the simulated spacecraft role.
@@ -190,7 +245,8 @@ type Config struct {
 	SatReg        SatReg                 `yaml:"satreg"`
 	AuthorityKeys []AuthorityKey         `yaml:"authority_keys"`
 	OpsAgents     []string               `yaml:"ops_agents"`  // ANS names allowed to request mandates
-	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier, until Phase 8
+	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier; fallback when no trust_index
+	TrustIndex    TrustIndexCfg          `yaml:"trust_index"`
 	FlightRules   FlightRules            `yaml:"flight_rules"`
 	Auditor       AuditorCfg             `yaml:"auditor"`
 	Spacecraft    SpacecraftCfg          `yaml:"spacecraft"`
