@@ -11,6 +11,7 @@
 package planner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -20,6 +21,66 @@ import (
 	"github.com/arjitsama/overpass/internal/passes"
 	"github.com/arjitsama/overpass/internal/schema"
 )
+
+// Input is everything a planner needs. The greedy scheduler and the LLM planner
+// (internal/llmplan) both consume it through the Planner interface, so one can
+// stand in for the other and the greedy plan is always the fallback.
+type Input struct {
+	Table    []passes.Pass
+	Stations []Station
+	// Quotes are station-supplied prices keyed by PriceKey(pass). AmountCents
+	// drives the greedy score; the whole quote is what propose_booking forwards.
+	Quotes  map[string]schema.Quote
+	Request Request
+	// Context is trusted operator mission context, e.g. "anomaly: prefer any
+	// uplink in the next 90 minutes". It may reach the model.
+	Context string
+	// Notes is station-supplied FREE TEXT keyed by host (card descriptions, quote
+	// notes). It is hostile input: the greedy planner ignores it and the LLM
+	// planner must never place it in a model prompt (master plan §7 rev 3.4).
+	Notes map[string]string
+}
+
+// Planner turns an Input into a Plan. Implemented by Greedy and by
+// internal/llmplan.Planner.
+type Planner interface {
+	Plan(ctx context.Context, in Input) (Plan, error)
+}
+
+// Greedy adapts the deterministic Schedule to the Planner interface. It ignores
+// ctx, Context and Notes.
+type Greedy struct{}
+
+// Plan implements Planner using the greedy scheduler.
+func (Greedy) Plan(_ context.Context, in Input) (Plan, error) {
+	prices := make(map[string]int64, len(in.Quotes))
+	for k, q := range in.Quotes {
+		prices[k] = q.AmountCents
+	}
+	return Schedule(in.Table, in.Stations, prices, in.Request)
+}
+
+// Proposal is one booking the LLM planner asks the authority to authorize.
+type Proposal struct {
+	Quote schema.Quote
+	Mode  string
+}
+
+// Outcome is the authority's answer to a Proposal: a signed mandate, or a named
+// refusal. The model cannot exceed policy, so a refusal is a normal result, not
+// an error (master plan §7 rev 3.3).
+type Outcome struct {
+	Accepted  bool
+	MandateID string
+	Code      string
+	Reason    string
+}
+
+// Proposer forwards a proposal to the mission authority. propose_booking calls
+// this; the authority applies the flight rules and the trust tier.
+type Proposer interface {
+	Propose(ctx context.Context, p Proposal) (Outcome, error)
+}
 
 // Trust tiers (master plan 11).
 const (
@@ -77,12 +138,17 @@ type Candidate struct {
 
 // Plan is the planner's output. Selected is in AOS order.
 type Plan struct {
-	Request    Request     `json:"request"`
-	Selected   []Candidate `json:"selected"`
-	Others     []Candidate `json:"others"`
-	ContactS   int64       `json:"contact_s"`
-	GoalMet    bool        `json:"goal_met"`
-	Excluded   []string    `json:"excluded_hosts,omitempty"` // removed by Replan
+	Request  Request     `json:"request"`
+	Selected []Candidate `json:"selected"`
+	Others   []Candidate `json:"others"`
+	ContactS int64       `json:"contact_s"`
+	GoalMet  bool        `json:"goal_met"`
+	Excluded []string    `json:"excluded_hosts,omitempty"` // removed by Replan
+	// Explanation is the LLM planner's plain-language summary for the dashboard;
+	// empty for the greedy planner (the dashboard then shows the structured plan).
+	Explanation string `json:"explanation,omitempty"`
+	// Source names the planner that produced this plan: "greedy" or "llm".
+	Source     string `json:"source,omitempty"`
 	candidates []Candidate
 	stations   map[string]Station
 	prices     map[string]int64

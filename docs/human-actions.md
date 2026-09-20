@@ -164,6 +164,18 @@ Tick an item (`[x]`) when it's done, and note when.
   drive the dashboard. If a fully live demo is wanted, wire them to the real pass
   flow and `cmd/battery`.
 
+## Phase 10 (LLM planner)
+
+- [ ] **Provide the model key (H5).** Export `ANTHROPIC_API_KEY` for the Ops
+  agent so the LLM planner can run; without it the planner uses the greedy plan.
+  The live acceptance test runs only with `ANS_LIVE_LLM=1` and the key set.
+- [ ] **(Optional) Choose the model.** The planner defaults to `claude-sonnet-5`
+  (`llmplan.DefaultModel`); set `Planner.ModelName` if you want a different model.
+- [ ] **Know the guarantee.** The model only *proposes*; `propose_booking` forwards
+  to the authority, which enforces the flight rules and the trust tier. Station
+  free text is never shown to the model. A slow or wrong model never books beyond
+  policy and never delays a pass (10s timeout, greedy fallback).
+
 ## Before the demo
 
 - [ ] **Refresh the TLE** a day or two before judging: `bin/passes -refresh-tle`. It reads CelesTrak
