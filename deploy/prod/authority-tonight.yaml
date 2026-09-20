@@ -1,0 +1,58 @@
+# Mission authority — TONIGHT's first-live-pass variant. Renders ${...} from
+# agents.env. Differs from authority.yaml in exactly two truthful ways:
+#
+#  1. operator_allow.uplink names gs-blacksburg explicitly. This is the flight
+#     rules' "stations named by the operator" branch — an OPERATOR POLICY, NOT a
+#     trust score. The authority grants uplink to a named station on operator
+#     policy and records the basis as "operator allow-list"; it never displays
+#     this as an index tier and never as FIDUCIARY. Command classes, max cents,
+#     daily limit and window are still enforced for the named station.
+#
+#  2. trust_index.url is empty tonight, so no live trust source is required for
+#     the first pass. Non-allow-listed stations still fail closed (no vector ->
+#     no tier -> refused). In the second phase we point url at
+#     http://127.0.0.1:8080 for the DISPLAYED vector only; uplink stays
+#     allow-list-gated unless `make tier-check` shows the vector clears the rule.
+role: authority
+host: authority.${BASE_DOMAIN}
+port: ${AUTHORITY_PORT}
+public_url: https://authority.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/authority/server.pem, key_file: /etc/overpass/certs/authority/server.key}
+identity: {key_file: /etc/overpass/certs/authority/identity.key, chain_file: /etc/overpass/certs/authority/identity.pem}
+db_path: /var/lib/overpass/authority.db
+ops_agents:
+  - ans://v0.1.0.ops.${BASE_DOMAIN}
+flight_rules:
+  min_tier: TRANSACTIONAL
+  command_classes: {uplink: [telemetry, attitude], downlink: [telemetry]}
+  max_cents_per_pass: 500000
+  max_passes_per_day: 8
+  # Overpass access-tier thresholds on the truthful trust vector (phase 8).
+  downlink_min_integrity: 50
+  uplink_min_integrity: 80
+  uplink_min_behavior: 80
+  uplink_min_passes: 3
+  min_cert_type: DV
+  # Operator allow-list — stations the operator names for a mode. NOT a trust
+  # score. The tier gate is skipped only for these hosts; everything else in the
+  # flight rules still applies.
+  operator_allow:
+    uplink:
+      - gs-blacksburg.${BASE_DOMAIN}
+trust_index:
+  # Empty tonight: no live trust source needed for the allow-listed first pass.
+  url: ""
+  admin_key_env: ""
+  agents:
+    gs-blacksburg.${BASE_DOMAIN}: ${GS_BLACKSBURG_AGENT_ID}
+card:
+  version: 0.1.0
+  agent_id: ${AUTHORITY_AGENT_ID}
+  display_name: Mission Authority
+  description: Signs command mandates under the flight rules and trust tiers.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/authority/agent-card.json
+  skills:
+    - {id: issue_mandate, name: Issue mandate, tags: [authority]}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}

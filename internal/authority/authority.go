@@ -224,20 +224,31 @@ func (a *Authority) checkPolicy(ctx context.Context, q schema.Quote, host string
 	if len(a.Rules.Stations) > 0 && !contains(a.Rules.Stations, host) {
 		return nil, errs.New(errs.PolicyRefusedStation, host+" is not an allowed station")
 	}
-	eval, err := a.Trust.Evaluate(ctx, host)
-	if err != nil {
-		// Fail closed: with no trustworthy read of the station, refuse rather
-		// than sign against a stale or absent tier (master plan §11).
-		return nil, errs.New(errs.PolicyRefusedTier, "trust index unavailable: "+err.Error())
-	}
-	tier := OverpassTier(eval, a.Rules)
-	if rank(tier) < rank(a.Rules.MinTier) {
-		return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("%s is %s, flight rules need %s", host, tier, a.Rules.MinTier))
-	}
-	if q.Mode == schema.ModeUplink && tier != planner.TierFiduciary {
-		return nil, errs.New(errs.PolicyRefusedTier,
-			fmt.Sprintf("uplink needs FIDUCIARY; %s is %s (integrity %d, behavior %d, %d audited passes, audit_failures=%v)",
-				host, tier, eval.Integrity, eval.Behavior, eval.AuditedPasses, eval.AuditFailures))
+	// The operator allow-list (flight-rules "stations named explicitly") grants
+	// the mode by operator policy and skips the trust-vector tier gate. This is
+	// NOT a trust score — it is labeled "operator allow-list", never FIDUCIARY.
+	// Every other rule below (classes, amount, daily limit) still applies.
+	if a.operatorAllows(host, q.Mode) {
+		if a.Emit != nil {
+			a.Emit(bus.Event{Agent: a.ANSName, Kind: "mandate_basis", Subject: q.Station, Result: "operator_allow",
+				Reason: "operator allow-list: flight rules name " + host + " for " + q.Mode})
+		}
+	} else {
+		eval, err := a.Trust.Evaluate(ctx, host)
+		if err != nil {
+			// Fail closed: with no trustworthy read of the station, refuse rather
+			// than sign against a stale or absent tier (master plan §11).
+			return nil, errs.New(errs.PolicyRefusedTier, "trust index unavailable: "+err.Error())
+		}
+		tier := OverpassTier(eval, a.Rules)
+		if rank(tier) < rank(a.Rules.MinTier) {
+			return nil, errs.New(errs.PolicyRefusedTier, fmt.Sprintf("%s is %s, flight rules need %s", host, tier, a.Rules.MinTier))
+		}
+		if q.Mode == schema.ModeUplink && tier != planner.TierFiduciary {
+			return nil, errs.New(errs.PolicyRefusedTier,
+				fmt.Sprintf("uplink needs FIDUCIARY; %s is %s (integrity %d, behavior %d, %d audited passes, audit_failures=%v)",
+					host, tier, eval.Integrity, eval.Behavior, eval.AuditedPasses, eval.AuditFailures))
+		}
 	}
 	allowed := a.Rules.CommandClasses[q.Mode]
 	classes := requested
@@ -259,6 +270,17 @@ func (a *Authority) checkPolicy(ctx context.Context, q schema.Quote, host string
 		return nil, errs.New(errs.PolicyRefusedDailyLimit, "flight rules allow no passes")
 	}
 	return classes, nil
+}
+
+// operatorAllows reports whether the flight rules name this host explicitly for
+// the mode (an operator allow-list, not a trust score).
+func (a *Authority) operatorAllows(host, mode string) bool {
+	for _, h := range a.Rules.OperatorAllow[mode] {
+		if h == host {
+			return true
+		}
+	}
+	return false
 }
 
 func rank(tier string) int {

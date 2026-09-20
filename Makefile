@@ -1,10 +1,18 @@
-.PHONY: build test lint run-local smoke accept clean trust-up trust-down preflight
+.PHONY: build test lint run-local smoke accept clean trust-up trust-down preflight tier-check
 
 BIN := bin/agent
 TRUST_DIR := third_party/agent-trust-discovery
+# Authority config tier-check reads (override: make tier-check CONFIG=path).
+CONFIG ?= deploy/prod/authority.yaml
 
 build:
-	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery ./cmd/trustseed ./cmd/opsflow
+	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery ./cmd/trustseed ./cmd/opsflow ./cmd/tiercheck
+
+# Print each station's truthful five-dimension trust vector (from the configured
+# trust index if reachable, else index-not-configured/unreachable), the tier that
+# vector earns, and the operator allow-list decision — kept clearly separate.
+tier-check:
+	go run ./cmd/tiercheck -config $(CONFIG)
 
 # Start the forked trust index locally on :8080 (admin auth off for the demo).
 trust-up:

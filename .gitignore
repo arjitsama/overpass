@@ -7,3 +7,11 @@ certs/
 *.db
 .run/
 /agent
+# Stray binaries if a `go build ./cmd/<x>/` is run from the repo root.
+/battery
+/tiercheck
+/opsflow
+/passes
+/satreg
+/cardhash
+/trustseed

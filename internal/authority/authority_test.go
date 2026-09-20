@@ -191,6 +191,31 @@ func TestLookalikeVerifiesButNoUplink(t *testing.T) {
 	}
 }
 
+// The operator allow-list (flight-rules named stations) grants a mode by operator
+// policy, bypassing the trust-vector tier gate, but still enforces the other
+// rules. It is not a trust score.
+func TestOperatorAllowList(t *testing.T) {
+	f := newFixture(t)
+	// gs-svalbard-eu is READ_ONLY, so its uplink is normally refused on tier
+	// (TestPolicyRefusals). Naming it in the operator allow-list grants uplink.
+	f.a.Rules.OperatorAllow = map[string][]string{schema.ModeUplink: {"gs-svalbard-eu.example"}}
+	if _, err := f.issue(f.ctx, quote("gs-svalbard-eu.example", schema.ModeUplink, 1200)); err != nil {
+		t.Fatalf("operator-allowed uplink should be granted: %v", err)
+	}
+	// A READ_ONLY/TRANSACTIONAL station NOT on the list is still refused on tier.
+	if _, err := f.issue(f.ctx, quote("gs-awarua.example", schema.ModeUplink, 1200)); !errs.Is(err, errs.PolicyRefusedTier) {
+		t.Fatalf("non-allow-listed uplink should still be refused on tier: %v", err)
+	}
+	// Other rules still apply to an allow-listed station: a bad command class is refused.
+	if _, err := f.issue(f.ctx, quote("gs-svalbard-eu.example", schema.ModeUplink, 1200), "reboot"); !errs.Is(err, errs.PolicyRefusedClasses) {
+		t.Fatalf("class enforcement should still apply under the allow-list: %v", err)
+	}
+	// And the per-pass amount limit still applies.
+	if _, err := f.issue(f.ctx, quote("gs-svalbard-eu.example", schema.ModeUplink, 5001)); !errs.Is(err, errs.PolicyRefusedAmount) {
+		t.Fatalf("amount limit should still apply under the allow-list: %v", err)
+	}
+}
+
 // errTrust is a TrustSource that always fails, standing in for an unreachable
 // trust index.
 type errTrust struct{}

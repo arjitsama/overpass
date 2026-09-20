@@ -116,6 +116,14 @@ type FlightRules struct {
 	MaxCentsPerPass int64               `yaml:"max_cents_per_pass"`
 	MaxPassesPerDay int                 `yaml:"max_passes_per_day"`
 
+	// OperatorAllow is the flight-rules "stations named explicitly" branch
+	// (master plan 8.3): mode -> station hosts the OPERATOR authorizes directly.
+	// A named station is granted that mode by operator policy, bypassing the
+	// trust-vector tier gate (all other rules — classes, amount, daily limit,
+	// window — still apply). It is an operator allow-list, NEVER a trust score:
+	// the authority labels it "operator allow-list", not FIDUCIARY. Empty = none.
+	OperatorAllow map[string][]string `yaml:"operator_allow"`
+
 	// Overpass access-tier thresholds, computed from the truthful trust vector
 	// (master plan §11, revised). Zero values fall back to the documented
 	// defaults below, so an operator sets only what they want to change.
