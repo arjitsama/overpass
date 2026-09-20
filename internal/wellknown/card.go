@@ -213,6 +213,10 @@ func (b builder) unsignedCard() agentCard {
 	return card
 }
 
+// x402USDCBaseSepolia is the USDC contract the x402 challenge names (the
+// same value the supplier-conformance surface serves in `accepts[].asset`).
+const x402USDCBaseSepolia = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+
 // extensions lists the trust-stack extension and, only when the station
 // actually mounts it, the supplier-conformance MCP surface (rule 6).
 func (b builder) extensions() []extension {
@@ -225,7 +229,10 @@ func (b builder) extensions() []extension {
 				"endpoint": b.c.PublicURL + "/mcp/", "transport": "streamable-http", "protocolVersion": "2025-03-26",
 				"tools":         []string{"get_quote", "book_flight"},
 				"authorityHost": b.c.Supplier.AuthorityHost,
-				"x402":          map[string]any{"scheme": "exact", "network": "eip155:84532", "payTo": b.c.Pricing.PayTo, "asset": b.c.Pricing.Asset, "settlement": "none"},
+				// payTo attested in the signed card, both flat and under x402,
+				// so a verifier finds it whichever level it reads.
+				"payTo": b.c.Pricing.PayTo, "network": "eip155:84532", "asset": x402USDCBaseSepolia, "scheme": "exact",
+				"x402": map[string]any{"scheme": "exact", "network": "eip155:84532", "payTo": b.c.Pricing.PayTo, "asset": x402USDCBaseSepolia, "settlement": "none"},
 			},
 		})
 	}

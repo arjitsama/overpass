@@ -1,0 +1,16 @@
+{
+ "jsonrpc": "2.0",
+ "id": 31,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"check\": \"payto_binding_check\", \"threat_row\": \"M4/H7\", \"pay_to_observed\": \"0x0000000000000000000000000000000000000000\", \"attested_in_signed_card\": \"0x0000000000000000000000000000000000000000\", \"card_signed\": true, \"verdict\": \"PASS\", \"detail\": \"payTo matches attested identity in signed card\"}"
+   }
+  ],
+  "structuredContent": {
+   "result": "{\"check\": \"payto_binding_check\", \"threat_row\": \"M4/H7\", \"pay_to_observed\": \"0x0000000000000000000000000000000000000000\", \"attested_in_signed_card\": \"0x0000000000000000000000000000000000000000\", \"card_signed\": true, \"verdict\": \"PASS\", \"detail\": \"payTo matches attested identity in signed card\"}"
+  },
+  "isError": false
+ }
+}

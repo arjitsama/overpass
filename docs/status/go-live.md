@@ -260,3 +260,6 @@ cert fingerprints match the served certs. No service started yet.
   in its card either); card_drift_watch INCONCLUSIVE (env allowlist only);
   unknown_key_mandate, superseded_format, corrupt_jws: RATE_LIMITED on their
   side, nothing reached us. No pass claimed. Table: docs/status/fraud-redteam.md.
+- 05:09 payto_binding_check -> PASS after declaring payTo/network/asset
+  flat in the signed extension (card b97de46a…, served == frozen). Card is now
+  frozen for card_drift_watch; no further card changes planned.
