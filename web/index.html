@@ -20,12 +20,20 @@
   </header>
 
   <main>
-    <div class="controls" role="group" aria-label="Demo controls">
-      <button id="btn-demo" type="button" aria-describedby="demo-err">Run demo pass</button>
+    <div class="controls" role="group" aria-label="Live controls">
       <button id="btn-verify" type="button" aria-describedby="verify-err">Ask GoDaddy's agent to verify this station</button>
-      <span id="demo-err" class="field-error" hidden></span>
       <span id="verify-err" class="field-error" hidden></span>
     </div>
+
+    <div class="controls recorded-controls" role="group" aria-label="Recorded replay controls">
+      <span class="test-badge">Recorded replay</span>
+      <button id="btn-demo" type="button" aria-describedby="demo-note demo-err">Run demo pass (recorded)</button>
+      <span id="demo-note" class="muted">Replays a recorded demo stream — not a live pass.</span>
+      <span id="demo-err" class="field-error" hidden></span>
+    </div>
+
+    <!-- Shown (and announced) while a recorded replay is playing. -->
+    <div id="replay-banner" class="replay-banner" role="status" aria-live="polite" hidden></div>
 
     <div class="controls test-controls" role="group" aria-label="Test controls">
       <span class="test-badge">Test controls</span>
@@ -103,8 +111,10 @@
 
     <section aria-labelledby="battery-h">
       <h2 id="battery-h">Attack battery</h2>
-      <div class="controls">
-        <button id="btn-battery" type="button" aria-describedby="battery-err">Run battery</button>
+      <div class="controls recorded-controls" role="group" aria-label="Recorded battery replay">
+        <span class="test-badge">Recorded replay</span>
+        <button id="btn-battery" type="button" aria-describedby="battery-note battery-err">Run battery (recorded)</button>
+        <span id="battery-note" class="muted">Replays recorded battery results — a live run is <code>bin/battery</code>.</span>
         <span id="battery-err" class="field-error" hidden></span>
       </div>
       <h3 id="battery-results-h" tabindex="-1">Results</h3>

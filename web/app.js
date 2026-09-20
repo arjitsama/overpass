@@ -128,6 +128,22 @@
     region.appendChild(p);
   }
 
+  // Recorded-replay banner: visible and announced (role=status) while a recorded
+  // control is playing, so no one mistakes recorded data for a live pass.
+  function showReplayBanner(msg) {
+    var b = el("replay-banner");
+    if (!b) { return; }
+    b.textContent = "▶ " + msg;
+    b.hidden = false;
+  }
+  function hideReplayBannerSoon() {
+    var b = el("replay-banner");
+    if (!b) { return; }
+    if (global.setTimeout) {
+      global.setTimeout(function () { b.hidden = true; b.textContent = ""; }, 6000);
+    }
+  }
+
   function logLine(kind, text) {
     var logEl = el("event-log");
     if (!logEl) { return; }
@@ -256,16 +272,21 @@
     if (!doc) { return; }
     initTheme(doc, win);
 
-    wireButton("btn-demo", "demo-err", function () { return post("/ui/run-demo-pass", {}); });
+    wireButton("btn-demo", "demo-err", function () {
+      showReplayBanner("Recorded replay: showing recorded demo data, not a live pass.");
+      return post("/ui/run-demo-pass", {}).then(hideReplayBannerSoon);
+    });
     wireButton("btn-verify", "verify-err", function () {
       return post("/ui/verify-station", {}).then(function (res) { renderVerification(res); });
     });
     wireButton("btn-battery", "battery-err", function () {
+      showReplayBanner("Recorded replay: showing recorded battery results, not a live run.");
       return post("/ui/run-battery", {}).then(function (res) {
         var results = (res && res.results) || [];
         results.forEach(renderBattery);
         var h = el("battery-results-h");
         if (h && h.focus) { h.focus(); } // move focus to results heading (§12)
+        hideReplayBannerSoon();
       });
     });
 

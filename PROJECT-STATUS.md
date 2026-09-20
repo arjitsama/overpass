@@ -137,7 +137,10 @@ and to match the real external APIs read at build time, per hard rule 9):
   dashboard button (*Simulate compromise*) and a `test_controls`-gated
   `/control/compromise` route; the real revoke is optional, once, `gs-spare` only
   (docs/demo-runbook.md). Unit-tested (cut + reset).
-- **Demo drivers:** the dashboard's *Run demo pass* and *Run battery* buttons
+- **Demo drivers (labelled):** the dashboard's *Run demo pass (recorded)* and *Run
+  battery (recorded)* buttons sit in a "Recorded replay" group and raise a visible,
+  screen-reader-announced banner while they play, so recorded data is never mistaken
+  for a live run. They
   replay a recorded event stream (`web/testdata/demo-events.json`); *Ask GoDaddy's
   agent to verify* is a real webmesh call. A fully live pass/battery run is the
   agent flow / `cmd/battery`. (Phase 9)

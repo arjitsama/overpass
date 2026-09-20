@@ -134,6 +134,16 @@ button[aria-pressed="true"] {
 
 .muted { color: var(--muted); }
 .test-controls { border: 2px dashed var(--accent-fail); border-radius: 8px; padding: 10px 12px; }
+.recorded-controls { border: 2px dashed var(--border); border-radius: 8px; padding: 10px 12px; }
+.replay-banner {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 2px solid var(--accent-fail);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 700;
+}
 .test-badge {
   font-weight: 700;
   color: var(--bg);

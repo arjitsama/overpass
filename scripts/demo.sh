@@ -56,8 +56,8 @@ cat <<EOF
   Events (SSE):https://localhost:$OPS_PORT/events
 
   Demo beats:  docs/demo-runbook.md
-  Buttons:     Run demo pass · Ask GoDaddy's agent to verify · Run battery
-               Simulate compromise (test control)
+  Buttons:     Ask GoDaddy's agent to verify (live) · Simulate compromise (test)
+               Run demo pass (recorded) · Run battery (recorded)
 
   SESSION-CUT BEAT (1:45) — DEFAULT, repeatable for every judge:
       Press "Simulate compromise" on the dashboard (press again to reset), or:
