@@ -124,9 +124,19 @@ and to match the real external APIs read at build time, per hard rule 9):
   replay a recorded event stream (`web/testdata/demo-events.json`); *Ask GoDaddy's
   agent to verify* is a real webmesh call. A fully live pass/battery run is the
   agent flow / `cmd/battery`. (Phase 9)
-- **Planner wiring:** the greedy and LLM planners are libraries with tests; the
-  in-process `authority.Propose` is what the tests exercise. An A2A client from
-  Ops to the authority and an HTTP planning route are not wired. (Phase 10)
+- **Cross-process pass flow (Phase 12, in progress):** `internal/opsflow` now
+  drives a real pass over A2A — verify the station, quote, get a mandate from the
+  authority (`issue_mandate` over A2A, DPoP-signed), book, and relay one command —
+  with `cmd/opsflow` as its CLI and hermetic unit tests (full flow + the
+  unverified-peer-refused-before-quote ordering). **Still to land for item 1:** a
+  real-process `scripts/accept/phase-12.sh` on the local ANS stack (`../ans`) that
+  registers ops/authority/gs-blacksburg, runs them plus the spacecraft as separate
+  processes, and asserts true two-way `VerifyPeer` end to end. (Note: phase-3
+  verifies the local stack via a Go test, not runtime agent-to-agent VerifyPeer, so
+  wiring the local `environments`/root-keys into the ops+authority configs is new.)
+- **Planner wiring:** the greedy and LLM planners are libraries with tests;
+  `authority.Propose` is exercised in-process and now also reachable cross-process
+  via the opsflow path above. An HTTP planning route on Ops is not yet wired. (Phase 10)
 - **Trust index provenance:** `provenance.source` is carried via `aimId`
   (`overpass-seed` / `overpass-auditor`) because the index's API has no free
   `source` field. (Phase 8)
