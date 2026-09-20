@@ -117,3 +117,65 @@ Identity: Ed25519 trust card with a GoDaddy Private ANS x5c chain; ANS names
 
 **Status:** discovery only. No adapter built yet — awaiting your go-ahead given the
 on-chain and AP2-format findings above.
+
+## Step 0 re-check (read-only, 2026-09-20 04:30) — fraud battery vs our station
+
+Decision input for building `internal/supplieradapter`. Result: **not buildable
+honestly today**; see "Blockers".
+
+### What the fraud agent accepts (from `tools/list`, quoted)
+- Every attack tool and `run_battery` take `target_ans` ("ANS name of the target
+  agent (must be opted-in)") and `target_url` ("MCP endpoint URL of the target
+  agent"). So a target CAN be pointed at us, but the target must speak **MCP**
+  (`tools/call get_quote` / `book_flight`), not our A2A JSON-RPC.
+- Opt-in: "External targets must be ANS-registered ACTIVE and opted in via either
+  FRAUD_TARGET_ALLOWLIST or DNS TXT `_fraud-allow.<domain> "v1"`". Non-eligible
+  targets return `battery_verdict INELIGIBLE`. "Targets without govware booking
+  endpoints receive NOT_APPLICABLE verdicts for mandate-level attacks."
+- Codes it grades on: `MANDATE_REJECTED`, `DPOP_REJECTED`,
+  `MANDATE_PARSE_ERROR`, `PAYMENT_REQUIRED` (replay_settled).
+- `unknown_key_mandate`: "The supplier fetches the authority's published key from
+  its trust card and verifies the mandate signature."
+
+### The Spending Authority
+- It is `authority.webmesh.ai` (`ans://v1.0.4.authority.webmesh.ai`), tools
+  `get_policy` and `request_mandate` ("Issue a signed AP2 spending mandate";
+  inputs quote_id, total(number), currency, merchant_ans, scope_hint
+  `purchase:flight:MAD-SIN:2026-10-14`, subject_ans, traveler_dpop_jwk,
+  request_jws, settlement_addr). The **mandate output format is not described**
+  anywhere readable.
+- Its trust card publishes ONE key: EC P-256 (kid `_JgCdyej…`, x5c GoDaddy
+  Private ANS chain). No Ed25519 (OKP) key. `/.well-known/jwks.json` on
+  authority, supplier and traveler all return **500 Internal Server Error**;
+  `supplier.webmesh.ai/.well-known/http-message-signatures-directory` 500.
+  So the Ed25519 verification key the battery says a supplier must fetch is
+  **not published** right now.
+
+### The battery itself is currently broken on their side
+- `wrong_audience_attack` and `superseded_format_attack` (default target =
+  their own supplier): `Error executing tool …: request_mandate failed:
+  REQUEST_NOT_SIGNED`.
+- `run_battery` (default target, 04:30:42): `{"battery_verdict": "INCOMPLETE",
+  "error": "fixture mint failed: request_mandate failed: REQUEST_NOT_SIGNED",
+  "results": [], "coverage_matrix": {}, "summary": {}}`.
+  The authority now requires `request_jws` (GOVWARE_REQUEST_AUTH_ENABLED=1) and
+  the fraud agent's fixture minting does not sign, so it cannot obtain a single
+  mandate for any target, ours included.
+
+### Blockers (any one is enough to stop)
+1. Mandate wire format unknown (hard rule 9: do not invent an external API).
+2. Authority Ed25519 key not published (jwks 500; trust card is P-256 only).
+3. The battery cannot mint fixtures today, so a run against us would be
+   INCOMPLETE regardless of what we build.
+
+### What we can build honestly without Scott
+- An MCP `/mcp/` surface on gs-blacksburg with `get_quote` (mapped onto a real
+  upcoming pass, x402 accepts with the card's payTo) — but `book_flight` could
+  only reject at parse, which is explicitly NOT a pass. Not built.
+
+### Ask Scott for
+1. The AP2 mandate JSON schema and the exact RFC 9421 signature base.
+2. Where the Spending Authority's Ed25519 public key is published (jwks fix).
+3. `FRAUD_TARGET_ALLOWLIST` entry or confirmation that the
+   `_fraud-allow.gs-blacksburg.blacksburgbytes.club "v1"` TXT is honoured.
+4. Whether the fraud agent's fixture mint will be fixed (request_jws).

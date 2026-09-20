@@ -241,3 +241,12 @@ cert fingerprints match the served certs. No service started yet.
   overflow-x: hidden as the backstop.
 - Deployed: Linux agent rebuilt with the embedded web/, ops restarted;
   https://ops.blacksburgbytes.club/ui/ serves the new button.
+
+## Fraud battery step 0 (2026-09-20 04:31) — STOPPED, nothing built
+
+- fraud.webmesh.ai tools accept target_ans/target_url (MCP endpoint) and
+  opt-in via `_fraud-allow.<domain> "v1"` TXT. But: mandate format unpublished,
+  authority Ed25519 key unpublished (jwks 500), and run_battery against their
+  own supplier returns INCOMPLETE ("fixture mint failed: request_mandate
+  failed: REQUEST_NOT_SIGNED"). No adapter built; no claim of a pass. Details
+  and the questions for Scott in docs/webmesh-interop.md.
