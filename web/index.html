@@ -22,8 +22,16 @@
   <main>
     <div class="controls" role="group" aria-label="Live controls">
       <button id="btn-verify" type="button" aria-describedby="verify-err">Ask GoDaddy's agent to verify this station</button>
+      <button id="btn-verify-impostor" type="button" aria-describedby="verify-err">Verify the impostor</button>
       <span id="verify-err" class="field-error" hidden></span>
     </div>
+
+    <!-- Summary card for GoDaddy's agent (agent.webmesh.ai) verdict; filled by
+         renderVerification. The live region gets one sentence, never the JSON. -->
+    <section id="verify-section" aria-labelledby="verify-h" tabindex="-1" hidden>
+      <h2 id="verify-h">GoDaddy's agent verification</h2>
+      <div id="verify-card" class="verify-card"></div>
+    </section>
 
     <div class="controls recorded-controls" role="group" aria-label="Recorded replay controls">
       <span class="test-badge">Recorded replay</span>

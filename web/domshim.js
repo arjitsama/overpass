@@ -45,7 +45,10 @@ var IDS = [
   "demo-err", "verify-err", "battery-err",
   "ap-station", "ap-countdown", "ap-countdown-a11y", "ap-state", "ap-token", "ap-ack",
   "schedule-body", "agents-body", "battery-body", "battery-results-h",
-  "event-log", "alert-region", "timeline"
+  "event-log", "alert-region", "timeline",
+  "verify-card",
+  "verify-section",
+  "btn-verify-impostor"
 ];
 
 var registry = {};

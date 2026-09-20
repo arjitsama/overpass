@@ -112,12 +112,67 @@
     tbody.appendChild(tr);
   }
 
+  // Neutral wording for GoDaddy's evidence states: "absent" and
+  // "unable-to-check" are not failures.
+  var STATE_WORDS = {
+    "verified": ["ok", "verified"], "pass": ["ok", "pass"], "yes": ["ok", "yes"], "true": ["ok", "yes"],
+    "fail": ["bad", "fail"], "no": ["bad", "no"], "false": ["bad", "no"],
+    "observed": ["pending", "observed, not validated"], "absent": ["pending", "not published (optional)"],
+    "unable-to-check": ["pending", "not checked"], "unknown": ["pending", "unknown"],
+    "unreachable": ["pending", "not reachable"], "unreachable/tls-error": ["pending", "not reachable (TLS)"]
+  };
+  function stateWord(v) {
+    var k = String(v === undefined || v === null ? "unknown" : v).toLowerCase();
+    return STATE_WORDS[k] || ["pending", k];
+  }
+  function verifyRow(label, value, plain) {
+    var w = plain ? ["pending", String(value || "—")] : stateWord(value);
+    return "<div><dt>" + esc(label) + "</dt><dd>" + (plain ? esc(w[1]) : statusSpan(w[0], w[1])) + "</dd></div>";
+  }
+
+  // The verdict from GoDaddy's agent as a summary card: heading, a definition
+  // list of icon + text rows, one sentence for the live region, and the raw
+  // response collapsed in <details>. Hashes and JSON never reach a live region.
   function renderVerification(d) {
-    // A webmesh verdict for one station: log it and mark the agent row's note.
-    logLine("verification", (d.host || "") + ": " + (d.verdict || d.result || ""));
-    if (d.host && d.verdict) {
-      alertMsg("GoDaddy's agent verified " + d.host + ": " + d.verdict);
+    var host = d.host || "", raw = d.verdict || d.result || "", v = null;
+    if (typeof raw === "string") { try { v = JSON.parse(raw); } catch (e) { v = null; } }
+    else if (raw && typeof raw === "object") { v = raw; raw = JSON.stringify(v, null, 2); }
+    var ok = !!(v && v.ans_verified);
+    var heading = (ok ? "GoDaddy's agent verified " : "GoDaddy's agent could not verify ") + host;
+    var rows = "";
+    if (v) {
+      var ev = v.evidence_states || {}, cv = (v.compatibility_verdict || {}).dimensions || {};
+      rows += verifyRow("ANS registered", v.ans_registered ? "yes" : "no");
+      rows += verifyRow("Environment", v.environment, true);
+      rows += verifyRow("ANS name", v.ans_name || "none", true);
+      rows += verifyRow("Transparency log", ev.tl);
+      rows += verifyRow("DNSSEC", ev.dnssec);
+      rows += verifyRow("Agent card", ev.card);
+      rows += verifyRow("DNSid", ev.dnsid);
+      ["identity", "protocol", "auth", "attestations"].forEach(function (k) {
+        if (cv[k]) { rows += verifyRow("Compatibility: " + k, cv[k].state); }
+      });
+      if (v.compatibility_verdict && v.compatibility_verdict.can_traveler_transact !== undefined) {
+        rows += verifyRow("Can transact", v.compatibility_verdict.can_traveler_transact);
+      }
     }
+    var html = "<h3>" + esc(heading) + "</h3>" +
+      (rows ? '<dl class="verify-rows">' + rows + "</dl>" : "<p>No structured verdict was returned.</p>") +
+      '<details><summary>Raw response from agent.webmesh.ai</summary>' +
+      '<div class="raw-scroll" tabindex="0" aria-label="Raw response from agent.webmesh.ai, scrollable"><pre>' +
+      esc(typeof raw === "string" ? raw : JSON.stringify(raw)) + "</pre></div></details>";
+    setHTML("verify-card", html);
+    var sec = el("verify-section");
+    if (sec) { sec.hidden = false; if (sec.focus) { sec.focus(); } }
+    // One sentence, no JSON, for the live region and the log.
+    var sentence = heading;
+    if (v) {
+      var ev2 = v.evidence_states || {};
+      sentence += ": " + (v.ans_registered ? "registered in " + (v.environment || "ANS") : "not registered") +
+        ", transparency log " + stateWord(ev2.tl)[1] + ", DNSSEC " + stateWord(ev2.dnssec)[1] + ".";
+    }
+    logLine("verification", sentence);
+    if (host) { alertMsg(sentence); }
   }
 
   function alertMsg(msg) {
@@ -280,6 +335,13 @@
     });
     wireButton("btn-verify", "verify-err", function () {
       return post("/ui/verify-station", {}).then(function (res) { renderVerification(res); });
+    });
+    // The impostor is the same card one click away: gs-sva1bard-eu under this
+    // dashboard's own base domain (ops.<domain> -> gs-sva1bard-eu.<domain>).
+    wireButton("btn-verify-impostor", "verify-err", function () {
+      var parts = String((win.location && win.location.hostname) || "").split(".");
+      var impostor = "gs-sva1bard-eu" + (parts.length > 1 ? "." + parts.slice(1).join(".") : ".localhost");
+      return post("/ui/verify-station", { host: impostor }).then(function (res) { renderVerification(res); });
     });
     wireButton("btn-battery", "battery-err", function () {
       showReplayBanner("Recorded replay: showing recorded battery results, not a live run.");

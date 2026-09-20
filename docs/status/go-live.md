@@ -220,3 +220,24 @@ cert fingerprints match the served certs. No service started yet.
   can_traveler_transact=yes (identity/protocol/auth pass; attestations
   "unable-to-check", their Phase 2). gs-sva1bard-eu: ans_registered=false,
   identity=fail, can_traveler_transact=unknown, card unreachable (self-signed).
+
+## Dashboard: GoDaddy verdict summary card (2026-09-20 04:27)
+
+- web/: renderVerification now builds a card (h3 heading "verified <host>" /
+  "could not verify <host>", definition-list rows with icon + text + value:
+  ANS registered, environment, ANS name, transparency log, DNSSEC, agent
+  card, DNSid, compatibility identity/protocol/auth/attestations, can
+  transact; "absent" -> "not published (optional)", "unable-to-check" -> "not
+  checked"). Live region and log get one sentence, never JSON/hashes. Raw
+  response in a collapsed <details> with a focusable, labelled, scrollable
+  <pre> (overflow-wrap: anywhere). New "Verify the impostor" button posts
+  gs-sva1bard-eu.<base domain> to /ui/verify-station.
+- Tests: dom_test (+2 verification cases), TestHTMLStructure,
+  TestContrastAllThemes pass; axe-core CLI: 0 violations.
+- 360 px audit (Chrome, 360-px iframe, demo events + a long verdict with the
+  raw details open): document scrollWidth == viewport (356), raw box fits;
+  the three tables exceed 360 px but scroll inside their .table-scroll
+  wrappers, so the body never scrolls sideways. Added html/body
+  overflow-x: hidden as the backstop.
+- Deployed: Linux agent rebuilt with the embedded web/, ops restarted;
+  https://ops.blacksburgbytes.club/ui/ serves the new button.

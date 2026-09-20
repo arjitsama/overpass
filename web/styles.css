@@ -216,6 +216,24 @@ meter { width: 90px; height: 14px; }
   font-weight: 600;
 }
 
+/* GoDaddy's agent verdict card. Rows are icon + text + value; the raw JSON is
+   collapsed and scrolls inside its own box so the page never grows sideways. */
+.verify-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.verify-card h3 { margin: 0 0 10px; font-size: 1.05rem; overflow-wrap: anywhere; }
+.verify-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; margin: 0; }
+.verify-rows div { min-width: 0; }
+.verify-rows dt { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.verify-rows dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.verify-card details { margin-top: 10px; }
+.verify-card summary { cursor: pointer; }
+.raw-scroll { overflow-x: auto; max-height: 40vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
+.raw-scroll:focus { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+.raw-scroll pre { margin: 0; padding: 10px; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Nothing may push the page wider than the viewport (audited at 360px). */
+html, body { max-width: 100%; overflow-x: hidden; }
+main > section, .controls, .active-pass { min-width: 0; }
+#event-log .log-line, .field-error, .alert-region p, td, th { overflow-wrap: anywhere; }
+
 @media (max-width: 700px) {
   main { padding: 16px; }
   .app-header { padding-left: 16px; padding-right: 16px; }
