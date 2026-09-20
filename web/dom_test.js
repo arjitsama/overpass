@@ -30,6 +30,7 @@ assert.ok(agents.includes("Verified"), "verified status missing");
 assert.ok(agents.includes("Rejected"), "impostor rejection not in trust table");
 assert.ok(agents.includes("READ_ONLY"), "lookalike tier missing");
 assert.ok(agents.includes("<meter"), "meter element missing for a dimension");
+assert.ok(/DANE Skipped/.test(agents), "DANE outcome not rendered by name");
 
 // Active pass rendered.
 assert.strictEqual(shim.registry["ap-station"].textContent, "gs-blacksburg.example.com", "active pass station");

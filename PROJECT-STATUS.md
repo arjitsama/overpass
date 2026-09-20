@@ -102,6 +102,11 @@ and to match the real external APIs read at build time, per hard rule 9):
    the auditor role wired end to end; a **23-check** attack battery; SNI-passthrough
    deploy so each host keeps its **own** ANS-issued cert; a repo secret scanner in
    `make lint`; and `make preflight` as a deploy gate.
+7. **DANE reported by name (Phase 12):** `bin/agent --verify` and the dashboard
+   show the DANE outcome — `Verified` / `Skipped` / `NoRecords` / `Mismatch` —
+   never a bare pass. TLSA-without-DNSSEC is `Skipped` (present but not relied on),
+   a warning that still verifies; only a `Mismatch`/DNSSEC failure rejects. The
+   earlier "ANS rejects TLSA without DNSSEC" wording was corrected across the docs.
 6. **DNS is on Porkbun, not GoDaddy.** The plan assumed GoDaddy DNS; the domain
    `blacksburgbytes.club` is at Porkbun (ANS registration is still at GoDaddy —
    separate systems). DNSSEC + TLSA + SVCB support must be confirmed in the
@@ -170,8 +175,10 @@ Hosts (all `.blacksburgbytes.club`): `ops`, `authority`, `gs-blacksburg`,
 
 ### H1 — Domain & DNSSEC (Porkbun)
 1. Confirm `blacksburgbytes.club` is active.
-2. Porkbun → DNSSEC → **enable it** (ANS rejects the TLSA record without a
-   DNSSEC-signed zone).
+2. Porkbun → DNSSEC → **enable it**. Without DNSSEC the DANE check is `DANESkipped`
+   (TLSA present but not relied on) and verification still passes on badge +
+   receipt + cert-fingerprint; DNSSEC makes DANE count (`DANEVerified`), and only a
+   `DANEMismatch`/DNSSEC failure rejects.
 3. Confirm Porkbun can add **TXT, TLSA, and SVCB/HTTPS** records; if not, use the
    badge + receipt + cert-fingerprint fallback and report it truthfully.
 4. `export ANS_API_KEY=…` and `export ANS_BASE_URL=https://api.godaddy.com`.

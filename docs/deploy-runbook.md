@@ -16,8 +16,11 @@ Hosts (all `.blacksburgbytes.club`): `ops`, `authority`, `gs-blacksburg`,
 
 ## H1 — Domain & DNSSEC (Porkbun)
 1. Confirm **blacksburgbytes.club** is active in your Porkbun account.
-2. Porkbun → Domain Management → **DNSSEC**: enable it. ANS verifiers reject the
-   TLSA record without a DNSSEC-signed zone.
+2. Porkbun → Domain Management → **DNSSEC**: enable it. Without DNSSEC the SDK's
+   DANE check reports `DANESkipped` — the TLSA record is present but not relied on,
+   and verification still **passes** on badge + receipt + cert-fingerprint. DNSSEC
+   is what makes DANE actually count (`DANEVerified`); only a fingerprint
+   `DANEMismatch` or a DNSSEC failure is a hard reject.
 3. Confirm Porkbun lets you add **TXT**, **TLSA**, and **SVCB/HTTPS** records
    (custom record types). If it cannot serve TLSA/SVCB or sign the zone, the
    documented fallback is badge + SCITT receipt + cert-fingerprint only — record

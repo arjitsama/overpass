@@ -51,7 +51,7 @@ registrations on GoDaddy).
 ## Challenges
 Registration and DNS are permanent and unforgiving: the transparency log is
 append-only, and DANE means the TLSA record must equal the cert actually served,
-with DNSSEC on or verifiers won't trust it. The hardest idea was **cold-start
+and without DNSSEC the DANE check is skipped (present but not relied on) rather than trusted. The hardest idea was **cold-start
 trust**: a brand-new but honest station has no history, so it starts at
 availability/probation and earns uplink rights through audited passes — which is
 exactly why a registered lookalike with no history stays READ_ONLY.

@@ -69,6 +69,9 @@
     var tr = global.document.createElement("tr");
     var verif = d.verified ? statusSpan("ok", "Verified")
       : statusSpan("bad", "Rejected" + (d.reason ? ": " + d.reason : ""));
+    // Show the DANE outcome by name (Verified / Skipped / NoRecords / Mismatch),
+    // never a bare pass. Skipped/NoRecords are warnings that still verify.
+    if (d.dane) { verif += ' <span class="muted">DANE ' + esc(d.dane) + "</span>"; }
     tr.innerHTML =
       "<td>" + esc(d.name || d.ans) + "</td>" +
       "<td>" + verif + "</td>" +

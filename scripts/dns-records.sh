@@ -9,7 +9,9 @@
 #   _ans-badge.<host>  TXT   v=ans-badge1; version=v<ver>; url=<log>/v1/agents/<agentId>
 #   _443._tcp.<host>   TLSA  3 0 1 <SHA-256 of the full server certificate DER>
 #   <host>             SVCB  1 . alpn=a2a,h2
-# DNSSEC must be on for the zone or verifiers will not trust the TLSA record.
+# Without DNSSEC the DANE check is DANESkipped (TLSA present but not relied on);
+# verification still passes on badge + receipt + cert-fingerprint. Enable DNSSEC so
+# DANE actually counts (DANEVerified); only DANEMismatch/DNSSEC failure rejects.
 set -euo pipefail
 [[ $# -ge 4 ]] || { sed -n '2,13p' "$0" >&2; exit 2; }
 host=$1 version=$2 agent_id=$3 cert=$4 log=${5:-https://transparency.ans.godaddy.com}
