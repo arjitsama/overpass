@@ -45,6 +45,7 @@ func run(ctx context.Context, args []string) error {
 	norad := fs.Int64("norad", 27844, "NORAD id")
 	mode := fs.String("mode", "uplink", "uplink|downlink")
 	lead := fs.Duration("lead", time.Hour, "how far ahead the pass window starts")
+	demo := fs.Bool("demo", false, "stage demo: the pass window opens 15 s from now (inside the station's 30 s window slack), so relay_command is not WINDOW_CLOSED")
 	dur := fs.Duration("dur", 8*time.Minute, "pass duration")
 	maxElev := fs.Int64("max-elev", 45, "max elevation degrees")
 	insecure := fs.Bool("insecure", false, "skip TLS verification (local self-signed agents only)")
@@ -52,6 +53,11 @@ func run(ctx context.Context, args []string) error {
 	asJSON := fs.Bool("json", false, "print the result as JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *demo {
+		// Quotes need AOS strictly in the future; relay_command accepts a
+		// command up to session.Slack (30 s) before AOS. 15 s satisfies both.
+		*lead = 15 * time.Second
 	}
 	for name, v := range map[string]string{"-config": *cfgPath, "-station-host": *stationHost,
 		"-station-url": *stationURL, "-authority-url": *authorityURL} {

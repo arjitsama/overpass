@@ -85,7 +85,9 @@ for name in "${HOSTS[@]}"; do
 
   # Served agent-card hash (compare to <NAME>_METADATA_HASH from agents.env if set).
   if [[ -x $CARDHASH ]]; then
-    ch=$("$CARDHASH" "https://$host/.well-known/agent-card.json" 2>/dev/null | awk 'NR==1{print $NF}')
+    # SMOKE_CA: extra root bundle for cardhash when the OS store lacks the CA
+    # (e.g. GoDaddy TLS Root CA - R1). Verification proper is bin/agent --verify.
+    ch=$("$CARDHASH" ${SMOKE_CA:+-ca "$SMOKE_CA"} "https://$host/.well-known/agent-card.json" 2>/dev/null | awk 'NR==1{print $NF}')
     envvar="$(echo "$name" | tr 'a-z-' 'A-Z_')_METADATA_HASH"
     want="${!envvar:-}"
     if [[ -n $want ]]; then
@@ -104,7 +106,8 @@ for name in "${HOSTS[@]}"; do
     done
     served=$(printf '' | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \
       | openssl x509 -outform DER 2>/dev/null | openssl dgst -sha256 -r 2>/dev/null | awk '{print $1}')
-    tlsa=$(dig +short TLSA "_443._tcp.$host" 2>/dev/null | awk '{print tolower($NF)}' | tr -d '\n')
+    # dig may wrap the hex into several fields: join everything after "3 0 1".
+    tlsa=$(dig +short TLSA "_443._tcp.$host" 2>/dev/null | awk '{s=""; for(i=4;i<=NF;i++) s=s $i; print tolower(s)}' | tr -d '\n')
     if [[ -n $served && -n $tlsa ]]; then
       [[ $tlsa == *"$served"* ]] && add "tlsa=cert" || { add "tlsa!=cert"; overall=1; }
     fi

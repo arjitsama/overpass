@@ -141,3 +141,82 @@ cert fingerprints match the served certs. No service started yet.
 - [ ] Browser trust: the DV chain roots at "GoDaddy TLS Root CA - R1", absent
   from this Mac's system store; confirm with curl at step 8, else note it.
 - [ ] Optional `ANTHROPIC_API_KEY` drop-in for overpass@ops (H5).
+
+## Step 8 — services started (2026-09-20 03:17)
+
+- a1d0511 pushed to origin/main after confirming no certs/, .env, *.key, *.pem
+  or deploy/agents.env are tracked; secret-scan clean.
+- 07:11:41Z started overpass@ops, authority, gs-blacksburg, spacecraft,
+  gs-sva1bard-eu: all active, listening on their ports; overpass user reads
+  certs (root:overpass, 750/640). Unregistered agents (spacecraft, impostor)
+  write their card to /var/lib/overpass (their signed_file was under read-only
+  /etc). Registered agents reuse the frozen cards.
+- Finding: ops/authority/gs-blacksburg stopped resolving from outside once
+  HTTPS/SVCB records existed at those names (the wildcard `*` A no longer
+  matches an existing name, RFC 4592). Fix: explicit A records via
+  scripts/porkbun-dns.sh. spacecraft and the impostor (wildcard only) were fine.
+- Trust finding: the served ops chain (leaf + GoDaddy DV intermediate,
+  fingerprint 26311c83… = ANS-issued) is rejected by stock macOS curl with
+  system trust ("unable to get local issuer certificate"): "GoDaddy TLS Root
+  CA - R1" is not in the macOS root store. Agent-to-agent verification pins the
+  log-attested fingerprint and is unaffected. Dashboard plan pending user.
+- 03:29 Explicit A records for ops, gs-blacksburg, authority live at
+  1.1.1.1/8.8.8.8; the Mac's upstream resolver (router) holds the negative
+  answer for up to 1800 s (zone SOA minimum), so the smoke gate waits for it.
+- Smoke fixes: `bin/cardhash -ca <bundle>` (root the OS lacks) and
+  `SMOKE_CA`; TLSA parse joins dig's wrapped hex fields (was comparing only
+  the last fragment -> false `tlsa!=cert`). Served ops card == frozen
+  (72f3e657…); `bin/agent --verify ops` passed in the first smoke run.
+- 03:48 Smoke gate: ops PASS (health, cards, cardhash=72f3e657, TXT TXT
+  TLSA SVCB, tlsa=cert, verify). authority + gs-blacksburg answer HTTP 200 with
+  DNS bypassed (`--resolve`) but the Mac's mDNSResponder still caches the
+  negative A answer from before the explicit A records; needs a local flush
+  (`sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`).
+- Browser trust: stock macOS curl (SecureTransport, system store) rejects the
+  served chain (leaf + DV intermediate): "GoDaddy TLS Root CA - R1" (issued
+  Aug 2025) is not in the store. GoDaddy publishes a cross-certificate
+  `gd_tls_root-r1-cross-g2.crt` (R1 signed by the trusted G2 root, valid to
+  2037); `security verify-cert` with it in the chain: verified. Options
+  presented to the user; agents' certs untouched.
+- 04:09 Smoke gate PASS for ops, authority, gs-blacksburg (health,
+  agent-card, trust-card, cardhash == frozen, _ans/_ans-badge TXT, TLSA, SVCB,
+  tlsa=cert, bin/agent --verify) once the Mac's resolver cache expired.
+- 04:09:49 `bin/opsflow … -mode uplink` from the Mac: first failing check
+  `get_pass_quote`: the A2A POST client trusts the OS store, which lacks
+  "GoDaddy TLS Root CA - R1" (verify itself pins the attested fingerprint and
+  passed). Fix attempt 1: `-ca certs/ca/godaddy-r1-bundle.pem` (the genuine
+  GoDaddy R1 root + DV intermediate, not -insecure).
+- 04:10:08 retry: verify, quote, mandate and booking succeeded; stopped at
+  `relay_command: WINDOW_CLOSED` (the booked pass window has not opened).
+  Stopped after one fix attempt, per the user's rule.
+- The VPS's own trust store (Ubuntu ca-certificates) also lacks the R1 root:
+  curl from the box to gs-blacksburg by name fails the same way, so the ops
+  agent's planner on the box will hit it too until the root is installed
+  system-wide there (does not touch the agents' certs).
+
+## Chain fix + VPS root (2026-09-20 04:13)
+
+- Option 1 applied: each server.pem now serves leaf + GoDaddy DV intermediate +
+  `gd_tls_root-r1-cross-g2` (R1 cross-signed by the stock-trusted G2 root).
+  Leaf certs unchanged (fingerprints = TLSA). Three agents restarted.
+- VPS stock curl (no -k) to all three hosts: HTTP 200 before installing any
+  root, so the chain alone fixes OS-store clients. Then "GoDaddy TLS Root CA -
+  R1" installed system-wide on the box (update-ca-certificates), ops restarted.
+- Mac stock curl (system trust, no -k/-ca): HTTP 200 for ops, authority,
+  gs-blacksburg; served chain = 3 certs; leaf == TLSA and served card == frozen
+  for all three.
+- `bin/opsflow -demo` added (lead 15 s: quotes need AOS in the future, relay
+  accepts 30 s slack). First -demo run with lead 0 was refused by the station
+  (QUOTE_REJECTED:window, AOS not in the future) -> 15 s.
+- 04:13:47 LIVE UPLINK PASS, no -ca: station ans://v0.1.0.gs-blacksburg…,
+  quote q-dfb4ab41…, mandate m-ece7b51a…, booking b-505eaf2f…, ack accepted
+  (counter 1789892031006, telemetry sha256 c1a42a3d…).
+- 04:14 `bin/agent --verify` (Mac): ops, authority, gs-blacksburg
+  VERIFIED (warn; DANE Verified) with the named warn "card_hash: card hash: not
+  registered; card bound by signature to log-attested key"; gs-sva1bard-eu
+  FAILED "registered: no _ans-badge TXT record: not an ANS agent".
+- GoDaddy webmesh verify_agent via ops /ui/verify-station: gs-blacksburg
+  ans_verified=true, ans_registered=true, tl=verified, dnssec=verified,
+  can_traveler_transact=yes (identity/protocol/auth pass; attestations
+  "unable-to-check", their Phase 2). gs-sva1bard-eu: ans_registered=false,
+  identity=fail, can_traveler_transact=unknown, card unreachable (self-signed).

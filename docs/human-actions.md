@@ -10,7 +10,7 @@ Tick an item (`[x]`) when it's done, and note when.
 | [x] | H1 | Buy the domain(s). Export `ANS_API_KEY` and `ANS_BASE_URL=https://api.godaddy.com` in the shell. | Live checks on our hosts, Phase 11 |
 | [x] | H2 (Stage 1+2: ops, gs-blacksburg, authority ACTIVE 2026-09-20) | Register each agent: `scripts/register.sh <host> --step <step> --i-am-a-human-and-this-is-permanent`, one step at a time. Production registrations are permanent. | Live checks, Phase 11 |
 | [x] | H3 (via scripts/porkbun-dns.sh, 2026-09-20) | Create the DNS records that `scripts/dns-records.sh` prints, with DNSSEC on for the zone. | Live checks |
-| [ ] | H4 | Rent the VPS, add SSH access, run `deploy/install.sh`. | Phase 11 |
+| [x] | H4 (2026-09-20: 45.76.253.108, ops/authority/gs-blacksburg/spacecraft/impostor live, smoke PASS, live uplink pass) | Rent the VPS, add SSH access, run `deploy/install.sh`. | Phase 11 |
 | [ ] | H5 | Provide the LLM API key as an environment variable. | Phase 10 |
 | [ ] | H6 | Run `ans-cli revoke … --reason CERTIFICATE_HOLD` during the demo. | Demo |
 

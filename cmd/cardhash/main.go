@@ -13,6 +13,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -38,6 +39,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("cardhash", flag.ContinueOnError)
 	file := fs.String("file", "", "read the card from a file instead of a URL")
 	insecure := fs.Bool("k", false, "skip TLS verification (local self-signed agents only)")
+	caFile := fs.String("ca", "", "PEM bundle of extra root CAs to trust (e.g. a root the OS store lacks)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -47,7 +49,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	case *file != "":
 		raw, err = readFile(*file)
 	case fs.NArg() == 1:
-		raw, err = fetch(ctx, fs.Arg(0), *insecure)
+		raw, err = fetch(ctx, fs.Arg(0), *insecure, *caFile)
 	default:
 		return errors.New("usage: cardhash [-k] <card URL> | cardhash -file <path>")
 	}
@@ -77,7 +79,7 @@ func readFile(path string) ([]byte, error) {
 	return readCapped(f)
 }
 
-func fetch(ctx context.Context, url string, insecure bool) ([]byte, error) {
+func fetch(ctx context.Context, url string, insecure bool, caFile string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -85,7 +87,21 @@ func fetch(ctx context.Context, url string, insecure bool) ([]byte, error) {
 		return nil, err
 	}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecure} //nolint:gosec // opt-in -k for local self-signed agents
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecure, MinVersion: tls.VersionTLS12} //nolint:gosec // opt-in -k for local self-signed agents
+	if caFile != "" {
+		pem, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("-ca: %w", err)
+		}
+		pool, _ := x509.SystemCertPool()
+		if pool == nil {
+			pool = x509.NewCertPool()
+		}
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, errors.New("-ca: no certificates in " + caFile)
+		}
+		tr.TLSClientConfig.RootCAs = pool
+	}
 	resp, err := (&http.Client{Transport: tr}).Do(req)
 	if err != nil {
 		return nil, err
