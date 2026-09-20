@@ -132,6 +132,16 @@ button[aria-pressed="true"] {
   font-weight: 600;
 }
 
+.muted { color: var(--muted); }
+.test-controls { border: 2px dashed var(--accent-fail); border-radius: 8px; padding: 10px 12px; }
+.test-badge {
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent-fail);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
 .active-pass {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

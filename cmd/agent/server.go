@@ -85,6 +85,9 @@ func (a *agent) routes() http.Handler {
 	if a.cfg.Role == "ops" {
 		a.mountUI(mux)
 	}
+	if a.cfg.TestControls {
+		a.mountControls(mux)
+	}
 	mux.HandleFunc("/", a.root)
 	return a.recoverMW(limitBody(mux))
 }

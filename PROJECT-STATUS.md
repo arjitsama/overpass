@@ -120,6 +120,13 @@ and to match the real external APIs read at build time, per hard rule 9):
 
 ## Stubbed / deferred (consolidated from the phase status docs)
 
+- **Repeatable session-cut demo (Phase 12):** a `session.Compromise` test control
+  makes a chosen peer read as non-ACTIVE on the next status-token check, so the
+  session cuts (`SESSION_CUT:revoked`) and re-plans — repeatable and resettable
+  without a real `ans-cli revoke` (which is terminal). Exposed as a labelled
+  dashboard button (*Simulate compromise*) and a `test_controls`-gated
+  `/control/compromise` route; the real revoke is optional, once, `gs-spare` only
+  (docs/demo-runbook.md). Unit-tested (cut + reset).
 - **Demo drivers:** the dashboard's *Run demo pass* and *Run battery* buttons
   replay a recorded event stream (`web/testdata/demo-events.json`); *Ask GoDaddy's
   agent to verify* is a real webmesh call. A fully live pass/battery run is the

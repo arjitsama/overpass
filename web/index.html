@@ -27,6 +27,15 @@
       <span id="verify-err" class="field-error" hidden></span>
     </div>
 
+    <div class="controls test-controls" role="group" aria-label="Test controls">
+      <span class="test-badge">Test controls</span>
+      <button id="btn-compromise" type="button" aria-pressed="false" aria-describedby="compromise-note">
+        Simulate compromise
+      </button>
+      <span id="compromise-note" class="muted">Cuts the active session and re-plans. Repeatable and
+        resettable; a simulation, not a real ANS revocation.</span>
+    </div>
+
     <section aria-labelledby="active-h">
       <h2 id="active-h">Active pass</h2>
       <dl class="active-pass">

@@ -253,6 +253,7 @@ type Config struct {
 	Session       SessionCfg             `yaml:"session"`
 	Rogue         bool                   `yaml:"rogue"`
 	RogueAck      string                 `yaml:"rogue_ack"`
+	TestControls  bool                   `yaml:"test_controls"` // enables the demo-only /control/compromise route
 	Environments  map[string]Environment `yaml:"environments"`
 	TrustRoots    []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
 	RegistryURL   string                 `yaml:"registry_url"`

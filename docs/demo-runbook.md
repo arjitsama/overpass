@@ -17,10 +17,25 @@ Keyboard: Tab / Shift-Tab to move, Enter/Space to activate. VoiceOver: ⌘F5.
 | 0:45 | Impostor rejected | Point to the impostor row: Rejected. | "A lookalike with no ANS registration. We never read its quote." | The row is in the trust table from the demo stream. |
 | 0:55 | Registered lookalike | Point to gs-svalbard-eu: Verified, READ_ONLY. | "It registered properly and passes every identity check. Identity is not trust. No audited history, so the authority refuses an uplink mandate for it — even when its quote tried to talk our AI planner into it." | — |
 | 1:25 | Active pass | Show the Active pass section: station, countdown, session state, last Ack. | "The mandate names this station, this satellite, this window. Ops signs each command with a counter, so the station can relay but cannot forge or replay." | — |
-| 1:45 | **Revoke (H6)** | In the second terminal paste the line `scripts/demo.sh` printed: `ans-cli revoke <gs-blacksburg AgentID> --reason CERTIFICATE_HOLD`. | "The station was just revoked in the registry. Next status token, session cut, next pass re-booked elsewhere. A network blip alone would not have cut it." | If the live revoke stalls, the recorded run shows the session cut + replan. |
+| 1:45 | **Session cut (default: simulated)** | Press **"Simulate compromise"** (a labelled test control) on the dashboard. The Active pass reads "Session cut" and the alert region announces the cut + re-plan. Press it again to reset — repeatable for every judge. | "The station's status token just went non-ACTIVE. Next check, the session is cut and the next pass is re-booked elsewhere. A network blip alone would not have cut it." | It is already the resettable default; if the button misfires, `curl -ksX POST …/ui/simulate-compromise -d '{"on":true}'`. |
 | 2:10 | Battery | Tab to **Run battery**, Enter; focus lands on Results. | "GoDaddy's fraud battery plus our own: forged mandates, replayed proofs, a real authority that does not own this satellite. All blocked, each with a named reason." | Results also render from the recorded stream. |
 | 2:35 | Auditor / rogue drop | Show gs-rogue's tier dropped after the canary. | "This station was trusted and its passes looked clean. Our auditor sent it a forged mandate as a canary and it accepted. It lost uplink rights." | — |
 | 2:50 | Accessibility close | Take your hand off the mouse. | "Keyboard only, the whole way. It works with a screen reader, in high contrast, and without color." | — |
+
+## The real revoke (optional, once, spare station only)
+
+ANS revocation is **terminal** — `REVOKED` has no outgoing transition, so
+`ans-cli revoke` works exactly once and cannot be undone. The default demo beat is
+therefore the **simulated** cut above (repeatable, resettable). If you want to show
+one genuine registry revocation for a judge, do it **once**, and only against the
+designated spare station **`gs-spare`** — never `gs-blacksburg`:
+
+```sh
+ans-cli revoke <gs-spare AgentID> --reason CERTIFICATE_HOLD   # H6, one time only
+```
+
+After that, `gs-spare` is permanently revoked; keep using "Simulate compromise" for
+every subsequent judge.
 
 ## If everything fails
 Play the saved screen recording (make one during rehearsal). Venue Wi-Fi down:

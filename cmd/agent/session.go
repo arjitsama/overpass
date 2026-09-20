@@ -81,9 +81,13 @@ func sessionSkills(cfg config.Config, db *store.Store, emit func(bus.Event), log
 	if env == "" {
 		env = config.ProdEnv
 	}
-	keeper := verify.NewKeeper(verify.Policy{MaxAge: verify.DefaultMaxAge}, func(ctx context.Context, agentID string) (*verify.Token, error) {
-		return v.FreshToken(ctx, env, agentID)
-	})
+	// The compromise switch (a demo-only test control, armed via /control/compromise
+	// when test_controls is set) wraps the fetch so an armed peer reads as revoked
+	// on the next check and the session cuts — repeatable and resettable.
+	keeper := verify.NewKeeper(verify.Policy{MaxAge: verify.DefaultMaxAge}, compromiseSwitch.Wrap(
+		func(ctx context.Context, agentID string) (*verify.Token, error) {
+			return v.FreshToken(ctx, env, agentID)
+		}))
 	m := &session.Manager{ANSName: wellknown.ANSName(cfg), Store: db,
 		Uplink: remoteSpacecraft{&a2a.Client{URL: cfg.Session.SpacecraftURL, HTTP: hc}},
 		Caller: station.PopCaller, Keeper: keeper, Emit: emit, Now: time.Now, Every: session.TokenEvery,

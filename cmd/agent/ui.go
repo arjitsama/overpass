@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"strings"
+
 	"github.com/arjitsama/overpass/internal/bus"
 	"github.com/arjitsama/overpass/internal/errs"
 	"github.com/arjitsama/overpass/internal/webmesh"
@@ -22,6 +24,51 @@ func (a *agent) mountUI(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/run-demo-pass", a.uiRunDemoPass)
 	mux.HandleFunc("/ui/verify-station", a.uiVerifyStation)
 	mux.HandleFunc("/ui/run-battery", a.uiRunBattery)
+	mux.HandleFunc("/ui/simulate-compromise", a.uiSimulateCompromise)
+}
+
+// uiSimulateCompromise is the dashboard's repeatable, resettable session-cut
+// test control. It arms/resets the process compromise switch (so a live station
+// session cuts) AND streams the cut + replan to the dashboard so the beat is
+// visible for every judge. It is a clearly-labelled TEST control, not a real
+// revocation (which is terminal); see docs/demo-runbook.md.
+func (a *agent) uiSimulateCompromise(w http.ResponseWriter, r *http.Request) {
+	if !uiPost(w, r) {
+		return
+	}
+	var body struct {
+		On      bool   `json:"on"`
+		Station string `json:"station"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	station := body.Station
+	if station == "" {
+		station = "gs-blacksburg." + hostSuffix(a.cfg.Host)
+	}
+	if body.On {
+		compromiseSwitch.Arm("*")
+		a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: "session_cut", Subject: station,
+			Result: "cut", Reason: "SESSION_CUT:revoked: simulated compromise (test control)",
+			Data: map[string]any{"station": station, "test_control": true}})
+		a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: "replan", Subject: station,
+			Result: "ok", Reason: "removed " + station + " after the cut; re-booking elsewhere",
+			Data: map[string]any{"removed": station, "test_control": true}})
+	} else {
+		compromiseSwitch.Reset("*")
+		a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: "simulate_compromise", Subject: station,
+			Result: "reset", Reason: "simulated compromise reset (test control)",
+			Data: map[string]any{"station": station, "test_control": true}})
+	}
+	writeJSON(w, map[string]any{"compromised": body.On, "station": station, "test_control": true})
+}
+
+// hostSuffix returns the part of an ops host after the first label, e.g.
+// "ops.blacksburgbytes.club" -> "blacksburgbytes.club"; falls back to "localhost".
+func hostSuffix(host string) string {
+	if i := strings.IndexByte(host, '.'); i >= 0 {
+		return host[i+1:]
+	}
+	return "localhost"
 }
 
 // uiEvent is one recorded demo event; its Data drives a dashboard section.

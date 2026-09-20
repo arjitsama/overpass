@@ -266,6 +266,21 @@
       });
     });
 
+    // Simulate compromise: a repeatable, resettable TEST control that cuts the
+    // session and re-plans. Toggles between arm and reset.
+    var compromise = el("btn-compromise");
+    if (compromise) {
+      compromise.addEventListener("click", function () {
+        var arming = compromise.getAttribute("aria-pressed") !== "true";
+        post("/ui/simulate-compromise", { on: arming }).then(function () {
+          compromise.setAttribute("aria-pressed", arming ? "true" : "false");
+          compromise.textContent = arming ? "Reset compromise" : "Simulate compromise";
+          alertMsg(arming ? "Simulated compromise armed (test control): session cut, re-planning."
+            : "Simulated compromise reset (test control).");
+        }).catch(function (e) { alertMsg("Simulate compromise failed: " + e.message); });
+      });
+    }
+
     if (typeof win.EventSource === "function") {
       var es = new win.EventSource("/events");
       es.onmessage = function (m) {

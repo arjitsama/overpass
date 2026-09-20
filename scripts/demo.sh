@@ -9,7 +9,9 @@ cd "$(dirname "$0")/.."
 
 OPS_PORT=${SMOKE_OPS_PORT:-8443}
 STATION_PORT=${SMOKE_STATION_PORT:-8444}
-REVOKE_AGENT_ID=${REVOKE_AGENT_ID:-<gs-blacksburg AgentID from agents.env>}
+# The real revoke is OPTIONAL, done at most once, and only against the spare
+# station gs-spare (never gs-blacksburg): ANS revocation is terminal.
+SPARE_AGENT_ID=${SPARE_AGENT_ID:-<gs-spare AgentID from agents.env>}
 
 echo "== building =="
 make build >/dev/null || { echo "build failed" >&2; exit 1; }
@@ -55,12 +57,18 @@ cat <<EOF
 
   Demo beats:  docs/demo-runbook.md
   Buttons:     Run demo pass · Ask GoDaddy's agent to verify · Run battery
+               Simulate compromise (test control)
 
-  AT THE REVOCATION BEAT (1:45), in another terminal, run:
+  SESSION-CUT BEAT (1:45) — DEFAULT, repeatable for every judge:
+      Press "Simulate compromise" on the dashboard (press again to reset), or:
+      curl -ksX POST https://localhost:$OPS_PORT/ui/simulate-compromise -d '{"on":true}'
+      curl -ksX POST https://localhost:$OPS_PORT/ui/simulate-compromise -d '{"on":false}'   # reset
+    A live station with test_controls set can be cut for real (still resettable):
+      curl -ksX POST https://<station>/control/compromise -d '{"on":true}'
 
-      ans-cli revoke $REVOKE_AGENT_ID --reason CERTIFICATE_HOLD
-
-  (This script does NOT run it. Set REVOKE_AGENT_ID to the real Agent ID.)
+  OPTIONAL, ONCE, SPARE STATION ONLY — a real terminal revocation:
+      ans-cli revoke $SPARE_AGENT_ID --reason CERTIFICATE_HOLD
+      (Only gs-spare, never gs-blacksburg. This script does NOT run it.)
 ============================================================
 
 Press Ctrl-C to stop.
