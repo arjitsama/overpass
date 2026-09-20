@@ -17,10 +17,10 @@ means it passed its acceptance script and a hostile review, and was tagged.
 | 8 | Trust index and tiers | ✅ done, tag `phase-8` | [plan](docs/plans/phase-8.md) | [status](docs/status/phase-8.md) |
 | 9 | Dashboard and accessibility | ✅ done, tag `phase-9` | [plan](docs/plans/phase-9.md) | [status](docs/status/phase-9.md) |
 | 10 | LLM planner | ✅ done, tag `phase-10` | [plan](docs/plans/phase-10.md) | [status](docs/status/phase-10.md) |
-| 11 | Live deploy and demo | ⬜ not started | — | — |
+| 11 | Deploy, demo, submission | ✅ done, tag `v1.0` | [plan](docs/plans/phase-11.md) | [status](docs/status/phase-11.md) |
 
 ## Where things stand
-- Phases 0–10 are shipped: an agent binary (`--role ops|authority|station|auditor|spacecraft`),
+- Phases 0–11 are shipped: an agent binary (`--role ops|authority|station|auditor|spacecraft`),
   a red-team `battery`, a `passes`/`satreg`/`cardhash` toolset, a forked trust
   index (`third_party/agent-trust-discovery`) with an Overpass `pass_delivery`
   behavior signal, and a keyboard-and-screen-reader-first dashboard served by Ops

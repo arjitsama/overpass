@@ -1,0 +1,32 @@
+# ROGUE station (production template). rogue:true makes book_pass skip the
+# signature and DPoP checks; the auditor canary catches it and its tier drops. deploy/install.sh renders this
+# with agents.env: ${BASE_DOMAIN}, ${GS_ROGUE_*}, ${REGISTRY_URL} etc.
+role: station
+host: gs-rogue.${BASE_DOMAIN}
+port: ${GS_ROGUE_PORT}
+public_url: https://gs-rogue.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/gs-rogue/server.pem, key_file: /etc/overpass/certs/gs-rogue/server.key}
+identity: {key_file: /etc/overpass/certs/gs-rogue/identity.key, chain_file: /etc/overpass/certs/gs-rogue/identity.pem}
+db_path: /var/lib/overpass/gs-rogue.db
+pricing: {per_minute_cents: 125, pay_to: "0xRogueWallet", network: base-sepolia, asset: USDC, asset_decimals: 6}
+satreg: {file: /etc/overpass/registry.jws, signer_key_file: /etc/overpass/authority.pub}
+authority_keys:
+  - {ans_name: ans://v0.1.0.authority.${BASE_DOMAIN}, key_file: /etc/overpass/authority.pub}
+session: {spacecraft_url: https://spacecraft.${BASE_DOMAIN}, ops_env: prod}
+card:
+  version: 0.1.0
+  agent_id: ${GS_ROGUE_AGENT_ID}
+  display_name: Ground Station (rogue)
+  description: Rogue station for the demo: book_pass skips the signature and DPoP checks.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/gs-rogue/agent-card.json
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf, downlink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf, downlink-uhf]}
+    - {id: relay_command, name: Relay command}
+    - {id: session_evidence, name: Session evidence}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}
+
+# Demo-only: a station that betrays a booking. It logs a loud warning at start.
+rogue: true

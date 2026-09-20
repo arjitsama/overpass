@@ -176,6 +176,21 @@ Tick an item (`[x]`) when it's done, and note when.
   free text is never shown to the model. A slow or wrong model never books beyond
   policy and never delays a pass (10s timeout, greedy fallback).
 
+## Phase 11 (deploy, demo, submission)
+
+- [ ] **Follow `docs/deploy-runbook.md`** end to end — it is the full step-by-step
+  for H1 (domain + DNSSEC at Porkbun), H2 (permanent ANS registration), H3 (DNS
+  records in the Porkbun UI), H4 (VPS bring-up with `deploy/install.sh`), H5 (model
+  key), and H6 (the live revoke beat).
+- [ ] **Fill `deploy/agents.env`** on the VPS from `deploy/agents.env.example`:
+  `BASE_DOMAIN` (defaults to blacksburgbytes.club), each `*_AGENT_ID` and log URL
+  from registration. Secrets go in systemd drop-ins, never the repo.
+- [ ] **Gate the deploy:** `make preflight` locally, then
+  `scripts/smoke.sh blacksburgbytes.club --gate` once the hosts are up.
+- [ ] **Rehearse + submit:** `docs/demo-runbook.md` cold start under 3 minutes,
+  the `docs/a11y-manual.md` VoiceOver pass, save a screen recording, then submit
+  via `docs/devpost.md` with all three tracks.
+
 ## Before the demo
 
 - [ ] **Refresh the TLE** a day or two before judging: `bin/passes -refresh-tle`. It reads CelesTrak

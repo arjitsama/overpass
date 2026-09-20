@@ -35,6 +35,7 @@ func run(ctx context.Context, args []string, logw io.Writer) error {
 	cfgPath := fs.String("config", "", "path to the agent's YAML config (required)")
 	role := fs.String("role", "", "override role: "+strings.Join(config.Roles, "|"))
 	writeCard := fs.String("write-card", "", "write the signed agent card to this path and exit (to compute metaDataHash before registering)")
+	verifyHost := fs.String("verify", "", "verify a peer host and exit (read-only VerifyPeer; for scripts/smoke.sh)")
 	if err := fs.Parse(args); err != nil {
 		return errs.New(errs.BadRequest, err.Error())
 	}
@@ -44,6 +45,9 @@ func run(ctx context.Context, args []string, logw io.Writer) error {
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		return err
+	}
+	if *verifyHost != "" {
+		return verifyPeer(ctx, cfg, *verifyHost, logw)
 	}
 	if *role != "" {
 		cfg.Role = *role

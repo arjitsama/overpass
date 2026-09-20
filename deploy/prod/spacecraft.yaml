@@ -1,0 +1,24 @@
+# Spacecraft (production template): the simulated satellite. Accepts a command
+# only with a valid typ, signature, NORAD ID and a strictly greater counter.
+# RF and the bus are simulated (see README "Honest limits").
+role: spacecraft
+host: spacecraft.${BASE_DOMAIN}
+port: ${SPACECRAFT_PORT}
+public_url: https://spacecraft.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/spacecraft/server.pem, key_file: /etc/overpass/certs/spacecraft/server.key}
+identity: {key_file: /etc/overpass/certs/spacecraft/identity.key, chain_file: /etc/overpass/certs/spacecraft/identity.pem}
+db_path: /var/lib/overpass/spacecraft.db
+spacecraft:
+  norad_id: 27844
+  ops_key_file: /etc/overpass/certs/ops/command.pub
+card:
+  version: 0.1.0
+  agent_id: ${SPACECRAFT_AGENT_ID}
+  display_name: Spacecraft (simulated)
+  description: Simulated CubeSat command endpoint (NORAD 27844).
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/spacecraft/agent-card.json
+  skills:
+    - {id: uplink, name: Uplink command, tags: [spacecraft]}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}

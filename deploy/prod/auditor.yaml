@@ -1,0 +1,36 @@
+# Auditor (production template): audits finished passes and runs canary probes,
+# posting pass_delivery to the trust index. Renders ${...} from agents.env.
+role: auditor
+host: auditor.${BASE_DOMAIN}
+port: ${AUDITOR_PORT}
+public_url: https://auditor.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/auditor/server.pem, key_file: /etc/overpass/certs/auditor/server.key}
+identity: {key_file: /etc/overpass/certs/auditor/identity.key, chain_file: /etc/overpass/certs/auditor/identity.pem}
+authority_keys:
+  - {ans_name: ans://v0.1.0.authority.${BASE_DOMAIN}, key_file: /etc/overpass/authority.pub}
+auditor:
+  env: prod
+  station_keys:
+    - {ans_name: ans://v0.1.0.gs-blacksburg.${BASE_DOMAIN}, key_file: /etc/overpass/certs/gs-blacksburg/identity.pub}
+    - {ans_name: ans://v0.1.0.gs-awarua.${BASE_DOMAIN}, key_file: /etc/overpass/certs/gs-awarua/identity.pub}
+    - {ans_name: ans://v0.1.0.gs-svalbard-eu.${BASE_DOMAIN}, key_file: /etc/overpass/certs/gs-svalbard-eu/identity.pub}
+    - {ans_name: ans://v0.1.0.gs-rogue.${BASE_DOMAIN}, key_file: /etc/overpass/certs/gs-rogue/identity.pub}
+trust_index:
+  url: ${TRUST_INDEX_URL}
+  admin_key_env: ${TRUST_ADMIN_KEY_ENV}
+  agents:
+    gs-blacksburg.${BASE_DOMAIN}: ${GS_BLACKSBURG_AGENT_ID}
+    gs-awarua.${BASE_DOMAIN}: ${GS_AWARUA_AGENT_ID}
+    gs-svalbard-eu.${BASE_DOMAIN}: ${GS_SVALBARD_AGENT_ID}
+    gs-rogue.${BASE_DOMAIN}: ${GS_ROGUE_AGENT_ID}
+card:
+  version: 0.1.0
+  agent_id: ${AUDITOR_AGENT_ID}
+  display_name: Overpass Auditor
+  description: Re-verifies finished passes and probes stations with canaries.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/auditor/agent-card.json
+  skills:
+    - {id: audit_pass, name: Audit pass, tags: [auditor]}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}

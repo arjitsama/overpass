@@ -1,4 +1,4 @@
-.PHONY: build test lint run-local smoke accept clean trust-up trust-down
+.PHONY: build test lint run-local smoke accept clean trust-up trust-down preflight
 
 BIN := bin/agent
 TRUST_DIR := third_party/agent-trust-discovery
@@ -20,6 +20,11 @@ test:
 lint:
 	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 	go vet ./...
+	scripts/secret-scan.sh
+
+# Full pre-ship gate: tests, the honest-station battery, and a local smoke.
+preflight:
+	scripts/preflight.sh
 
 run-local: build
 	scripts/run-local.sh

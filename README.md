@@ -3,6 +3,46 @@
 Multi-agent broker for satellite ground station passes, built for VTHacks 14.
 A booking gives a station time-boxed authority to relay commands, and Agent
 Name Service (ANS) verification gates every step. Design: `docs/master-plan.md`.
+Progress and per-phase status: `PROGRESS.md`.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Overpass
+    Ops[Ops - planner + dashboard]
+    Auth[Mission Authority]
+    Aud[Auditor]
+    subgraph Stations
+      GS1[gs-blacksburg]
+      GS2[gs-awarua]
+      LK[gs-svalbard-eu - registered lookalike]
+      RG[gs-rogue]
+    end
+    SC[Spacecraft - simulated]
+    TI[(Trust index<br/>agent-trust-discovery fork)]
+  end
+  ANS[(ANS registry + transparency log)]
+  WM[GoDaddy agent.webmesh.ai]
+
+  Ops -- VerifyPeer --> ANS
+  Ops -- discover/verify --> WM
+  Ops -- propose_booking --> Auth
+  Auth -- reads tier --> TI
+  Auth -- issue_mandate --> Ops
+  Ops -- book_pass --> GS1
+  Ops -- signed command --> GS1
+  GS1 -- relay (cannot forge) --> SC
+  Aud -- audit + canary --> GS1
+  Aud -- pass_delivery --> TI
+  Ops -. availability .-> GS2 & LK & RG
+```
+
+Ops finds and verifies stations through ANS, the authority signs a mandate only
+if the flight rules and the station's trust tier allow it, the station relays
+Ops-signed commands to the (simulated) spacecraft without being able to forge or
+replay them, and the auditor scores behavior back into the trust index. One
+binary plays every role: `--role ops|authority|station|auditor|spacecraft`.
 
 ## Quick start
 
@@ -180,6 +220,65 @@ scripts/local-ans.sh stop
 - `scripts/register.sh <host>` only prints the plan. Each step needs `--step <step>`
   and `--i-am-a-human-and-this-is-permanent`.
 - `scripts/dns-records.sh` prints the DNS records to create.
+
+## How verification works
+
+Before Ops trusts a station it runs `VerifyPeer` (`internal/verify`), which checks,
+in order: the ANS **badge** (registered + ACTIVE in the transparency log), the
+**identity cert** chain, the **DANE/TLSA** record equals the SHA-256 of the cert
+actually served on :443 (needs DNSSEC), the **SCITT receipt**, and the signed
+**agent card** — whose `jku` we resolve ourselves and pin to the ANS-verified
+host, requiring the card's `x5c` leaf to match the attested identity cert (this
+closes `jku` injection). GoDaddy's own `agent.webmesh.ai` verifies our stations
+live, and we verify them. Run one check from a script:
+
+```sh
+bin/agent --config <cfg> --verify gs-blacksburg.blacksburgbytes.club   # read-only
+scripts/smoke.sh blacksburgbytes.club                                   # all hosts, read-only
+```
+
+## Trust and tiers
+
+Identity is not authorization. A forked `agent-trust-discovery` index scores each
+agent on five dimensions; Overpass's authority gates access on the **truthful**
+trust vector in its `flight_rules` — availability (verified), downlink (integrity
+≥ 50, no audit failures), uplink (integrity ≥ 80, behavior ≥ 80, ≥ 3 audited
+passes). Our added `pass_delivery` behavior signal is fed by the auditor. A
+registered lookalike passes every identity check but, with no audited history,
+stays READ_ONLY. `make trust-up` runs the index locally; see
+`docs/status/phase-8.md`.
+
+## Dashboard and the LLM planner
+
+The Ops agent serves a framework-free, keyboard- and screen-reader-first
+dashboard at `/ui/` (axe-clean; `docs/a11y-manual.md`). An LLM planner
+(`internal/llmplan`) proposes bookings through tools, but `propose_booking` only
+forwards to the authority — **policy, not the model, holds authority** — and
+station free text never reaches the prompt. It falls back to the greedy plan on
+any error or a 10s timeout. Set `ANTHROPIC_API_KEY` to enable it.
+
+## Deploy and preflight
+
+```sh
+make preflight               # tests + honest-station battery + local smoke; gates a deploy
+make lint                    # gofmt + go vet + scripts/secret-scan.sh (no keys/certs committed)
+sudo deploy/install.sh --dry-run   # prints every action, changes nothing
+scripts/demo.sh              # cold start to the dashboard; prints the revoke command (never runs it)
+```
+
+Production bring-up (buy/register/DNS/VPS and the live revoke beat) is human work
+by design — full step-by-step in `docs/deploy-runbook.md`; the 3-minute demo in
+`docs/demo-runbook.md`; submission draft in `docs/devpost.md`.
+
+## Honest limits
+
+- The **spacecraft and the RF link are simulated** — no real radio, no real bus.
+- **No on-chain settlement**; x402 payment options are described, not executed.
+- Trust observations are **seeded** for the demo (behavior only, marked as seed
+  data). We never fabricate identity or integrity scores.
+- We **run our own trust index and auditor**; in production a neutral party would.
+- Local identity uses demo-CA (DV) certs, so the index's own FIDUCIARY tier isn't
+  reachable locally; Overpass gates on the truthful vector instead.
 
 ## Layout
 

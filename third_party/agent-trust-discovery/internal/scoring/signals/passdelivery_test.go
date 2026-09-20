@@ -25,7 +25,7 @@ func TestPassDeliveryEvaluate(t *testing.T) {
 		{"zero booked", obsOf(`{"booked":0,"delivered":0,"auditFailures":0}`), 0, false, "no audited passes yet"},
 		{"perfect", obsOf(`{"booked":10,"delivered":10,"auditFailures":0}`), 100, false, ""},
 		{"partial rounds half up", obsOf(`{"booked":8,"delivered":7,"auditFailures":0}`), 88, false, ""}, // 87.5 -> 88
-		{"partial rounds down", obsOf(`{"booked":3,"delivered":1,"auditFailures":0}`), 33, false, ""},     // 33.3 -> 33
+		{"partial rounds down", obsOf(`{"booked":3,"delivered":1,"auditFailures":0}`), 33, false, ""},    // 33.3 -> 33
 		{"audit failure caps a perfect record", obsOf(`{"booked":10,"delivered":10,"auditFailures":1}`), 40, true, ""},
 		{"audit failure below cap keeps its score", obsOf(`{"booked":10,"delivered":3,"auditFailures":2}`), 30, true, ""},
 	}

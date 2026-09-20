@@ -1,0 +1,32 @@
+# systemd template unit: one instance per agent, `overpass@<name>`, e.g.
+#   systemctl enable --now overpass@ops overpass@authority overpass@gs-blacksburg
+# %i is the agent name; its config is /etc/overpass/<name>.yaml. Secrets come from
+# the environment file, never the repo.
+[Unit]
+Description=Overpass agent (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=overpass
+Group=overpass
+EnvironmentFile=/etc/overpass/agents.env
+# Secrets (ANS_API_KEY, TRUST_ADMIN_KEY, ANTHROPIC_API_KEY) go in a drop-in:
+#   systemctl edit overpass@%i   ->   [Service]\nEnvironment=TRUST_ADMIN_KEY=...
+ExecStart=/usr/local/bin/agent --config /etc/overpass/%i.yaml
+Restart=on-failure
+RestartSec=2
+
+# Hardening.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/overpass
+StateDirectory=overpass
+AmbientCapabilities=
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

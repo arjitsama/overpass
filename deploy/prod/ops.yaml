@@ -1,0 +1,29 @@
+# Ops agent (production template): serves the dashboard at /ui/ and runs the
+# planner. deploy/install.sh renders ${...} from agents.env.
+role: ops
+host: ops.${BASE_DOMAIN}
+port: ${OPS_PORT}
+public_url: https://ops.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/ops/server.pem, key_file: /etc/overpass/certs/ops/server.key}
+identity: {key_file: /etc/overpass/certs/ops/identity.key, chain_file: /etc/overpass/certs/ops/identity.pem}
+db_path: /var/lib/overpass/ops.db
+card:
+  version: 0.1.0
+  agent_id: ${OPS_AGENT_ID}
+  display_name: Overpass Ops
+  description: Mission operations planner and dashboard.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/ops/agent-card.json
+  skills:
+    - {id: plan_passes, name: Plan passes, tags: [scheduler]}
+ui:
+  webmesh_url: https://agent.webmesh.ai/mcp
+  verify_host: gs-blacksburg.${BASE_DOMAIN}
+peers:
+  - {name: authority, url: https://authority.${BASE_DOMAIN}}
+  - {name: gs-blacksburg, url: https://gs-blacksburg.${BASE_DOMAIN}}
+  - {name: gs-awarua, url: https://gs-awarua.${BASE_DOMAIN}}
+  - {name: gs-svalbard-eu, url: https://gs-svalbard-eu.${BASE_DOMAIN}}
+  - {name: gs-rogue, url: https://gs-rogue.${BASE_DOMAIN}}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}

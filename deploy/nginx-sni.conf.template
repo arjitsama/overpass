@@ -1,0 +1,28 @@
+# SNI routing (nginx stream). Each host name reaches its own agent process,
+# which terminates its OWN ANS-issued server cert -- nginx does not terminate
+# TLS, it reads the SNI and passes the connection through. deploy/install.sh
+# renders ${BASE_DOMAIN} and the ports from agents.env into
+# /etc/nginx/streams-enabled/overpass.conf, then reloads nginx.
+#
+# Requires the nginx `stream` and `ssl_preread` modules (stock on Debian/Ubuntu).
+stream {
+    map $ssl_preread_server_name $overpass_upstream {
+        ops.${BASE_DOMAIN}            127.0.0.1:${OPS_PORT};
+        authority.${BASE_DOMAIN}      127.0.0.1:${AUTHORITY_PORT};
+        gs-blacksburg.${BASE_DOMAIN}  127.0.0.1:${GS_BLACKSBURG_PORT};
+        gs-awarua.${BASE_DOMAIN}      127.0.0.1:${GS_AWARUA_PORT};
+        gs-svalbard-eu.${BASE_DOMAIN} 127.0.0.1:${GS_SVALBARD_PORT};
+        gs-rogue.${BASE_DOMAIN}       127.0.0.1:${GS_ROGUE_PORT};
+        auditor.${BASE_DOMAIN}        127.0.0.1:${AUDITOR_PORT};
+        spacecraft.${BASE_DOMAIN}     127.0.0.1:${SPACECRAFT_PORT};
+        default                       127.0.0.1:${OPS_PORT};
+    }
+
+    server {
+        listen 443;
+        listen [::]:443;
+        ssl_preread on;
+        proxy_pass $overpass_upstream;
+        proxy_timeout 10m;   # long-lived /events SSE streams
+    }
+}

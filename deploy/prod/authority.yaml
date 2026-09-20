@@ -1,0 +1,41 @@
+# Mission authority (production template): issues mandates, gated by the flight
+# rules and the trust tier. Renders ${...} from agents.env.
+role: authority
+host: authority.${BASE_DOMAIN}
+port: ${AUTHORITY_PORT}
+public_url: https://authority.${BASE_DOMAIN}
+cert: {cert_file: /etc/overpass/certs/authority/server.pem, key_file: /etc/overpass/certs/authority/server.key}
+identity: {key_file: /etc/overpass/certs/authority/identity.key, chain_file: /etc/overpass/certs/authority/identity.pem}
+db_path: /var/lib/overpass/authority.db
+ops_agents:
+  - ans://v0.1.0.ops.${BASE_DOMAIN}
+flight_rules:
+  min_tier: TRANSACTIONAL
+  command_classes: {uplink: [telemetry, attitude], downlink: [telemetry]}
+  max_cents_per_pass: 500000
+  max_passes_per_day: 8
+  # Overpass access-tier thresholds on the truthful trust vector (phase 8).
+  downlink_min_integrity: 50
+  uplink_min_integrity: 80
+  uplink_min_behavior: 80
+  uplink_min_passes: 3
+  min_cert_type: DV   # production could require OV or EV
+trust_index:
+  url: ${TRUST_INDEX_URL}
+  admin_key_env: ${TRUST_ADMIN_KEY_ENV}
+  agents:
+    gs-blacksburg.${BASE_DOMAIN}: ${GS_BLACKSBURG_AGENT_ID}
+    gs-awarua.${BASE_DOMAIN}: ${GS_AWARUA_AGENT_ID}
+    gs-svalbard-eu.${BASE_DOMAIN}: ${GS_SVALBARD_AGENT_ID}
+    gs-rogue.${BASE_DOMAIN}: ${GS_ROGUE_AGENT_ID}
+card:
+  version: 0.1.0
+  agent_id: ${AUTHORITY_AGENT_ID}
+  display_name: Mission Authority
+  description: Signs command mandates under the flight rules and trust tiers.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/authority/agent-card.json
+  skills:
+    - {id: issue_mandate, name: Issue mandate, tags: [authority]}
+environments:
+  prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}
