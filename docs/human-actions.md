@@ -14,6 +14,34 @@ Tick an item (`[x]`) when it's done, and note when.
 | [ ] | H5 | Provide the LLM API key as an environment variable. | Phase 10 |
 | [ ] | H6 | Run `ans-cli revoke … --reason CERTIFICATE_HOLD` during the demo. | Demo |
 
+## Go-live Phase 0 — verified 2026-09-20 (no writes)
+
+- [x] `ans-cli` v0.1.18 installed from the module cache
+  (`go install github.com/agentnameservice/ans-sdk-go/cmd/ans-cli@v0.1.18`).
+- [x] **Flag surface matches `scripts/register.sh`:** `generate-csr`
+  (`--host --org --version --key-type --csr-type --out-dir`) and `register`
+  (`--host --version --name --identity-csr --server-csr --endpoint-protocol
+  --endpoint-url --metadata-url --function`). No `--metadata-hash` flag exists.
+- [x] **metaDataHash mechanism resolved.** The registration request
+  (`models/agent.go`) carries `metaDataUrl` only — **no hash field**.
+  `MetadataHashes` lives only on the transparency-log / SCITT side
+  (`transparency_schemas.go`, `verify/scitt`, `badge.go`): the **RA computes and
+  records the hash server-side from the live metadata URL**. So `register.sh`
+  (URL only) is correct; `scripts/local-register.sh` (hash-locally-and-send) is
+  **not** what v0.1.18 does and is not used tonight. Consequence: the frozen
+  agent-card must be **served live before the RA hashes it** → deploy/serve the
+  card before `verify-acme`/`verify-dns`.
+- [x] **DNS + DNSSEC live.** `ops`, `authority`, `gs-blacksburg`, root and `*`
+  all resolve to `45.76.253.108`; parent DS present; no stale `_ans`/TLSA.
+- [ ] **BLOCKER — fix `ANS_API_KEY` format (H1/H2).** The value in `./.env` is a
+  single part (no colon); `ans-cli` rejects it locally with
+  `invalid API key format, expected key:secret`. GoDaddy production SSO keys are
+  `Key:Secret`. Edit **line 7 of `./.env`** so the value is your GoDaddy
+  production **Key**, a literal `:`, then the **Secret** — from
+  https://developer.godaddy.com/keys (Production, the same pair the current Key
+  came from). Do not paste it into the chat. Then say go and Phase 0 re-runs
+  `ans-cli resolve agent.webmesh.ai`. Porkbun keys (`pk1_`/`sk1_`) are well-formed.
+
 ## Before registering (H2)
 
 - [ ] **Register in stages, and know who is NOT registered.** Register eight
