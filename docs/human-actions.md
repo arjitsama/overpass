@@ -149,6 +149,21 @@ Tick an item (`[x]`) when it's done, and note when.
   demo). Identity is displayed as measured; this is the only cert gate.
 - [ ] **`make demo-live` against production** is out of scope for Phase 8; a human runs it separately.
 
+## Phase 9 (dashboard and accessibility)
+
+- [ ] **Configure the verify button.** Set `ui.webmesh_url` (GoDaddy's agent MCP
+  endpoint, e.g. `https://agent.webmesh.ai/mcp`) and `ui.verify_host` (the station
+  FQDN to check) on the Ops agent config, so "Ask GoDaddy's agent to verify this
+  station" makes a real call. Without them the button returns a 400.
+- [ ] **Perform the VoiceOver walkthrough** in `docs/a11y-manual.md` on macOS
+  Safari before judging — it covers what only a screen-reader user can confirm.
+  The automated checks (contrast, structure, axe, recorded-event render) already
+  run in `scripts/accept/phase-9.sh`.
+- [ ] **(Optional) Wire live demo buttons.** `Run demo pass` and `Run battery`
+  currently replay a recorded event stream (`web/testdata/demo-events.json`) to
+  drive the dashboard. If a fully live demo is wanted, wire them to the real pass
+  flow and `cmd/battery`.
+
 ## Before the demo
 
 - [ ] **Refresh the TLE** a day or two before judging: `bin/passes -refresh-tle`. It reads CelesTrak

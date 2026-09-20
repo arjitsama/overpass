@@ -257,6 +257,13 @@ type Config struct {
 	TrustRoots    []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
 	RegistryURL   string                 `yaml:"registry_url"`
 	LogURL        string                 `yaml:"log_url"`
+	UI            UICfg                  `yaml:"ui"`
+}
+
+// UICfg configures the Ops dashboard's three POST routes (master plan §12).
+type UICfg struct {
+	WebmeshURL string `yaml:"webmesh_url"` // GoDaddy's agent MCP endpoint for verify-station
+	VerifyHost string `yaml:"verify_host"` // default station FQDN the verify button checks
 }
 
 // Load reads path, applies env overrides and defaults, and validates.

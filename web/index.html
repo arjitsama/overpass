@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Overpass — ground station pass broker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="skip-link" href="#pass-schedule">Skip to pass schedule</a>
+    <div class="titles">
+      <h1>Overpass</h1>
+      <p class="subtitle">Satellite <strong id="sat-name">AO-73 (FUNcube-1)</strong>,
+        NORAD ID <strong id="norad-id">39444</strong></p>
+    </div>
+    <button id="contrast-toggle" type="button" aria-pressed="false">
+      High-contrast mode
+    </button>
+  </header>
+
+  <main>
+    <div class="controls" role="group" aria-label="Demo controls">
+      <button id="btn-demo" type="button" aria-describedby="demo-err">Run demo pass</button>
+      <button id="btn-verify" type="button" aria-describedby="verify-err">Ask GoDaddy's agent to verify this station</button>
+      <span id="demo-err" class="field-error" hidden></span>
+      <span id="verify-err" class="field-error" hidden></span>
+    </div>
+
+    <section aria-labelledby="active-h">
+      <h2 id="active-h">Active pass</h2>
+      <dl class="active-pass">
+        <div><dt>Station</dt><dd id="ap-station">—</dd></div>
+        <div><dt>Countdown</dt>
+          <dd>
+            <span id="ap-countdown" class="countdown" aria-hidden="true">--:--</span>
+            <span id="ap-countdown-a11y" class="visually-hidden" aria-live="polite"></span>
+          </dd>
+        </div>
+        <div><dt>Session state</dt><dd id="ap-state" class="status">—</dd></div>
+        <div><dt>Token age</dt><dd id="ap-token">—</dd></div>
+        <div><dt>Last Ack</dt><dd id="ap-ack">—</dd></div>
+      </dl>
+    </section>
+
+    <section id="pass-schedule" tabindex="-1" aria-labelledby="schedule-h">
+      <h2 id="schedule-h">Pass schedule</h2>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Pass schedule table, scrollable">
+        <table id="schedule-table">
+          <caption>Upcoming passes, from public orbit data. The timeline graphic below adds nothing this table lacks.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Station</th>
+              <th scope="col">Mode</th>
+              <th scope="col">Acquisition (AOS)</th>
+              <th scope="col">Loss (LOS)</th>
+              <th scope="col">Max elevation</th>
+              <th scope="col">Tier</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-body">
+            <tr class="empty-row"><td colspan="7">No passes yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="timeline" aria-hidden="true" id="timeline"></div>
+    </section>
+
+    <section aria-labelledby="agents-h">
+      <h2 id="agents-h">Agents and trust</h2>
+      <p id="agents-note">Identity is not trust. A station may pass every identity check and still lack the audited history an uplink needs.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Agents and trust table, scrollable">
+        <table id="agents-table">
+          <caption>Each agent's verification checks and five trust dimensions.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Agent</th>
+              <th scope="col">Verification</th>
+              <th scope="col">Integrity</th>
+              <th scope="col">Identity</th>
+              <th scope="col">Solvency</th>
+              <th scope="col">Behavior</th>
+              <th scope="col">Safety</th>
+              <th scope="col">Tier</th>
+            </tr>
+          </thead>
+          <tbody id="agents-body">
+            <tr class="empty-row"><td colspan="8">No agents yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="battery-h">
+      <h2 id="battery-h">Attack battery</h2>
+      <div class="controls">
+        <button id="btn-battery" type="button" aria-describedby="battery-err">Run battery</button>
+        <span id="battery-err" class="field-error" hidden></span>
+      </div>
+      <h3 id="battery-results-h" tabindex="-1">Results</h3>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Battery results table, scrollable">
+        <table id="battery-table">
+          <caption>Each attack and the verdict the target returned.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Attack</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Observed code</th>
+              <th scope="col">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="battery-body">
+            <tr class="empty-row"><td colspan="4">Battery not run yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="log-h">
+      <h2 id="log-h">Event log</h2>
+      <div id="event-log" role="log" aria-live="polite" aria-label="Event log"></div>
+    </section>
+  </main>
+
+  <!-- Alert region for session cuts and rejections. Created empty at load. -->
+  <div id="alert-region" role="alert" aria-live="assertive"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

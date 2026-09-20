@@ -82,6 +82,9 @@ func onceFunc(f func()) func() {
 func (a *agent) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/events", a.bus.Handler())
+	if a.cfg.Role == "ops" {
+		a.mountUI(mux)
+	}
 	mux.HandleFunc("/", a.root)
 	return a.recoverMW(limitBody(mux))
 }

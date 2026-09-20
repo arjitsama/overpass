@@ -1,0 +1,12 @@
+[
+  {"kind":"pass","data":{"station":"gs-blacksburg.example.com","mode":"downlink","aos":"20:14:02Z","los":"20:23:40Z","max_elevation_deg":61,"tier":"TRANSACTIONAL","status":"booked"}},
+  {"kind":"pass","data":{"station":"gs-awarua.example.com","mode":"uplink","aos":"21:02:10Z","los":"21:11:55Z","max_elevation_deg":48,"tier":"FIDUCIARY","status":"booked"}},
+  {"kind":"agent","data":{"name":"gs-blacksburg","verified":true,"integrity":89,"identity":40,"solvency":null,"behavior":100,"safety":null,"tier":"FIDUCIARY"}},
+  {"kind":"agent","data":{"name":"gs-svalbard-eu (registered lookalike)","verified":true,"integrity":72,"identity":40,"solvency":null,"behavior":0,"safety":null,"tier":"READ_ONLY"}},
+  {"kind":"rejection","subject":"gs-sva1bard (impostor)","reason":"not registered in ANS","data":{"agent":"gs-sva1bard (impostor)","code":"CALLER_REJECTED"}},
+  {"kind":"agent","data":{"name":"gs-sva1bard (impostor)","verified":false,"reason":"not registered in ANS","integrity":null,"identity":null,"solvency":null,"behavior":null,"safety":null,"tier":"—"}},
+  {"kind":"active_pass","data":{"station":"gs-blacksburg.example.com","countdown_s":95,"session_state":"active","token_age_s":12,"last_ack":"counter 7"}},
+  {"kind":"battery","data":{"name":"replay_booking","verdict":"BLOCKED","observed":"DPOP_REJECTED:replay","detail":""}},
+  {"kind":"battery","data":{"name":"tamper_mandate","verdict":"BLOCKED","observed":"MANDATE_REJECTED:signature","detail":"refused with the expected code"}},
+  {"kind":"session_cut","subject":"gs-blacksburg.example.com","reason":"token_revoked","data":{"station":"gs-blacksburg.example.com","reason":"token_revoked"}}
+]

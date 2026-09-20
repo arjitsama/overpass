@@ -15,15 +15,16 @@ means it passed its acceptance script and a hostile review, and was tagged.
 | 6 | Pass session (commands, revocation) | ✅ done, tag `phase-6` | [plan](docs/plans/phase-6.md) | [status](docs/status/phase-6.md) |
 | 7 | Adversaries, battery, auditor | ✅ done, tag `phase-7` | [plan](docs/plans/phase-7.md) | [status](docs/status/phase-7.md) |
 | 8 | Trust index and tiers | ✅ done, tag `phase-8` | [plan](docs/plans/phase-8.md) | [status](docs/status/phase-8.md) |
-| 9 | Dashboard and accessibility | ⬜ not started | — | — |
+| 9 | Dashboard and accessibility | ✅ done, tag `phase-9` | [plan](docs/plans/phase-9.md) | [status](docs/status/phase-9.md) |
 | 10 | LLM planner | ⬜ not started | — | — |
 | 11 | Live deploy and demo | ⬜ not started | — | — |
 
 ## Where things stand
-- Phases 0–8 are shipped: an agent binary (`--role ops|authority|station|auditor|spacecraft`),
-  a red-team `battery`, a `passes`/`satreg`/`cardhash` toolset, and a forked trust
+- Phases 0–9 are shipped: an agent binary (`--role ops|authority|station|auditor|spacecraft`),
+  a red-team `battery`, a `passes`/`satreg`/`cardhash` toolset, a forked trust
   index (`third_party/agent-trust-discovery`) with an Overpass `pass_delivery`
-  behavior signal.
+  behavior signal, and a keyboard-and-screen-reader-first dashboard served by Ops
+  at `/ui/` (axe-clean; see [docs/status/phase-9.md](docs/status/phase-9.md)).
 - Trust tiers are enforced by the authority's flight rules on the **truthful**
   trust vector (never on fabricated identity/integrity); see
   [docs/status/phase-8.md](docs/status/phase-8.md).
