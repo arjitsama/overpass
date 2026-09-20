@@ -1,0 +1,16 @@
+{
+ "jsonrpc": "2.0",
+ "id": 21,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"error\": \"RATE_LIMITED\", \"code\": \"RATE_LIMITED\", \"battery_verdict\": \"INELIGIBLE\"}"
+   }
+  ],
+  "structuredContent": {
+   "result": "{\"error\": \"RATE_LIMITED\", \"code\": \"RATE_LIMITED\", \"battery_verdict\": \"INELIGIBLE\"}"
+  },
+  "isError": false
+ }
+}

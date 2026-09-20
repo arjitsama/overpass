@@ -250,3 +250,13 @@ cert fingerprints match the served certs. No service started yet.
   own supplier returns INCOMPLETE ("fixture mint failed: request_mandate
   failed: REQUEST_NOT_SIGNED"). No adapter built; no claim of a pass. Details
   and the questions for Scott in docs/webmesh-interop.md.
+
+## Fraud battery, stage 2 + first probes (2026-09-20 04:59)
+
+- Built and deployed `internal/supplieradapter` (/mcp/ on gs-blacksburg),
+  opt-in TXT live, station card re-frozen with the signed extension
+  (2a5204f7…, served == frozen). Smoke PASS x3; opsflow -demo PASS.
+- Probes: payto_binding_check WARNING (their reference supplier has no payTo
+  in its card either); card_drift_watch INCONCLUSIVE (env allowlist only);
+  unknown_key_mandate, superseded_format, corrupt_jws: RATE_LIMITED on their
+  side, nothing reached us. No pass claimed. Table: docs/status/fraud-redteam.md.
