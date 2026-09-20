@@ -16,6 +16,9 @@ authority_keys:
 # The spacecraft is internal (not ANS-registered) and serves a self-signed cert
 # generated on the box; pin it here.
 session: {spacecraft_url: https://spacecraft.${BASE_DOMAIN}, ops_env: prod, spacecraft_ca: /etc/overpass/certs/spacecraft/server.pem}
+# Supplier-conformance MCP surface at /mcp/ (GoDaddy fraud battery target).
+# Mandates verify against authority.webmesh.ai's published keys, pinned by host.
+supplier: {enabled: true, authority_host: authority.webmesh.ai, authority_ans: ans://v1.0.4.authority.webmesh.ai}
 card:
   version: 0.1.0
   agent_id: ${GS_BLACKSBURG_AGENT_ID}

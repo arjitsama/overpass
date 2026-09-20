@@ -87,6 +87,16 @@ type Pricing struct {
 	Note           string `yaml:"note"`           // plain-text note carried in the card's x-payment (e.g. "simulated; no settlement is performed")
 }
 
+// SupplierCfg mounts the supplier-conformance MCP surface (/mcp/) on a
+// station: get_quote (x402-challenged) and book_flight (AP2 mandate + DPoP),
+// verified against the Spending Authority's keys pinned by host. It is a
+// separate surface from the Overpass A2A flow and touches none of it.
+type SupplierCfg struct {
+	Enabled       bool   `yaml:"enabled"`
+	AuthorityHost string `yaml:"authority_host"` // e.g. authority.webmesh.ai (keys fetched from its trust card / jwks)
+	AuthorityANS  string `yaml:"authority_ans"`  // expected issuer ANS name, if the mandate names one
+}
+
 // SatReg is the station's signed satellite registry and its pinned signer.
 type SatReg struct {
 	File          string `yaml:"file"`
@@ -260,6 +270,7 @@ type Config struct {
 	Auditor       AuditorCfg             `yaml:"auditor"`
 	Spacecraft    SpacecraftCfg          `yaml:"spacecraft"`
 	Session       SessionCfg             `yaml:"session"`
+	Supplier      SupplierCfg            `yaml:"supplier"`
 	Rogue         bool                   `yaml:"rogue"`
 	RogueAck      string                 `yaml:"rogue_ack"`
 	TestControls  bool                   `yaml:"test_controls"` // enables the demo-only /control/compromise route

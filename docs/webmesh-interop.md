@@ -179,3 +179,60 @@ honestly today**; see "Blockers".
 3. `FRAUD_TARGET_ALLOWLIST` entry or confirmation that the
    `_fraud-allow.gs-blacksburg.blacksburgbytes.club "v1"` TXT is honoured.
 4. Whether the fraud agent's fixture mint will be fixed (request_jws).
+
+## Stage 1 recon (read-only, 2026-09-20 04:4x)
+
+### 1. Tools and arguments (from live `tools/list`)
+- fraud.webmesh.ai (16 tools). Every tool takes `target_ans` (default "") and
+  `target_url` (default ""). **Three tools take caller-supplied fixtures, which
+  bypasses their broken fixture mint:**
+  - `replay_booking`: `captured_mandate` (JSON-encoded mandate), `captured_dpop_proof`, `quote_id` (default "test-quote") — required: the two captured values.
+  - `underpay_booking`: `quote_id`, `valid_mandate` — both required.
+  - `tamper_mandate`: `valid_mandate` (required), `quote_id` (default "test-quote").
+  The other ten mandate/structural tools take only target_ans/target_url and
+  mint their own fixtures (currently failing with REQUEST_NOT_SIGNED).
+- supplier.webmesh.ai: `get_quote{origin,destination,date,party_size=1}`,
+  `book_flight{quote_id,option_id,mandate,dpop_proof,payment_auth=""}`.
+- authority.webmesh.ai: `get_policy{}`, `request_mandate{quote_id,total:number,
+  currency,merchant_ans,scope_hint,subject_ans,traveler_dpop_jwk,request_jws="",
+  settlement_addr=""}`. llms.txt: "compact EdDSA JWS (request_jws) signed by the
+  caller's ANS identity key, binding subject_ans, quote_id, total, currency,
+  merchant_ans, scope_hint, and traveler_dpop_jwk. Freshness window: 300 s. jti
+  must be unique. JWKS fetched from the caller's ANS JWKS endpoint."
+- traveler.webmesh.ai: `find_flights`, `request_booking{option_id,quote_id,
+  total:number,merchant_ans,scope}`.
+- auditor.webmesh.ai: `audit_transaction{evidence_bundle}` — evidence bundle is
+  `{mandate, ticket, stripe_tx_id, scitt_receipts, identity_chain}`; it checks
+  "Authority signature valid, audience matches supplier, scope covers route/date,
+  jkt in mandate matches traveler's declared key, ticket price <= max_amount".
+
+### 2. Supplier get_quote, captured bytes (unpaid)
+Request (POST https://supplier.webmesh.ai/mcp/, Content-Type application/json,
+Accept application/json, text/event-stream, Mcp-Session-Id from initialize):
+```
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_quote","arguments":{"origin":"MAD","destination":"SIN","date":"2026-10-14","party_size":1}}}
+```
+Response: HTTP 200, content-type application/json, `cache-control: no-store`,
+body (structuredContent identical to the text content):
+```
+{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"{...}"}],
+ "structuredContent":{"x402Version":2,"accepts":[{"scheme":"exact","network":"eip155:84532",
+ "asset":"0x036CbD53842c5426634e7929541eC2318f3dCF7e","amount":"10000",
+ "payTo":"0x5fFBbFe362dEA9cfF398f85D5599b083cB7b9c4f","maxTimeoutSeconds":300,
+ "extra":{"name":"USDC","version":"2"}}],"error":"Payment Required",
+ "resource":{"url":"mcp://tool/get_quote","description":"Flight quote from Madrid to Singapore (x402-gated)"}},
+ "isError":true}}
+```
+The three quote objects are behind the x402 payment (10000 base units = 0.01
+USDC on Base Sepolia); **not observed**. Their paid response shape is an
+evidence gap.
+
+### 3. Keys published today (verified)
+| host | agent-card JWS | trust-card keys | jwks.json | http-message-signatures-directory | did.json |
+|---|---|---|---|---|---|
+| authority | alg ES256, kid `_JgCdyej…`, jku trust-card | 1x EC P-256, x5c[3] (GoDaddy Private ANS) | 500 | 500 | 500 |
+| supplier | alg ES256, kid `IAn03g04…` | 1x EC P-256, x5c[3] | 500 | 500 | 500 |
+| fraud | alg ES256, kid `teMzkokP…` | 1x EC P-256, x5c[3] | 500 | 500 | 500 |
+No Ed25519 (OKP) key is published anywhere reachable. Their cards say
+"EdDSA"; their artifacts are ES256. mcp.json/ard.json/ai-catalog/agentfacts
+carry descriptions only, no output schemas.

@@ -14,6 +14,7 @@ import (
 	"github.com/arjitsama/overpass/internal/bus"
 	"github.com/arjitsama/overpass/internal/config"
 	"github.com/arjitsama/overpass/internal/errs"
+	"github.com/arjitsama/overpass/internal/supplieradapter"
 	"github.com/arjitsama/overpass/internal/wellknown"
 )
 
@@ -87,6 +88,18 @@ func (a *agent) routes() http.Handler {
 	}
 	if a.cfg.TestControls {
 		a.mountControls(mux)
+	}
+	if a.cfg.Role == "station" && a.cfg.Supplier.Enabled {
+		// Supplier-conformance MCP surface (fraud.webmesh.ai target). Separate
+		// from the A2A flow; same host, same cert, same nginx SNI passthrough.
+		sa := supplieradapter.New(supplieradapter.Config{
+			Host: a.cfg.Host, ANSName: wellknown.ANSName(a.cfg), PublicURL: a.cfg.PublicURL,
+			PayTo: a.cfg.Pricing.PayTo, Network: "eip155:84532", Asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+			AuthorityHost: a.cfg.Supplier.AuthorityHost, Authority: a.cfg.Supplier.AuthorityANS,
+			Log: a.log.With("surface", "mcp"),
+		})
+		mux.Handle("/mcp/", sa)
+		mux.Handle("/mcp", http.RedirectHandler("/mcp/", http.StatusTemporaryRedirect))
 	}
 	mux.HandleFunc("/", a.root)
 	return a.recoverMW(limitBody(mux))

@@ -180,7 +180,7 @@ func (b builder) unsignedCard() agentCard {
 		Name: c.Card.DisplayName, URL: c.PublicURL, Description: b.description(), Version: c.Card.Version,
 		ProtocolVersion: A2AProtocolVersion, DocumentationURL: c.PublicURL,
 		SupportedInterfaces: []iface{{URL: c.PublicURL, ProtocolBinding: "JSONRPC", ProtocolVersion: A2AProtocolVersion}},
-		Capabilities:        capabilities{Extensions: []extension{b.trustStackExt()}},
+		Capabilities:        capabilities{Extensions: b.extensions()},
 		SecuritySchemes:     b.sec.Schemes(), SecurityRequirements: b.sec.Requirements(),
 		DefaultInputModes:  []string{"application/json", "text/plain"},
 		DefaultOutputModes: []string{"application/json", "text/plain"},
@@ -211,6 +211,25 @@ func (b builder) unsignedCard() agentCard {
 			Examples: s.Examples, SecurityRequirements: b.sec.SkillRequirements(s.ID)})
 	}
 	return card
+}
+
+// extensions lists the trust-stack extension and, only when the station
+// actually mounts it, the supplier-conformance MCP surface (rule 6).
+func (b builder) extensions() []extension {
+	exts := []extension{b.trustStackExt()}
+	if b.c.Role == "station" && b.c.Supplier.Enabled {
+		exts = append(exts, extension{
+			URI:         "https://overpass.blacksburgbytes.club/ext/supplier-mcp/v1",
+			Description: "Supplier-shaped MCP surface for the AP2 fraud battery: get_quote (x402-challenged; the fee is never settled) and book_flight (AP2 mandate + DPoP verified against the Spending Authority's published keys; no on-chain settlement, a valid booking returns PAYMENT_REQUIRED).",
+			Params: map[string]any{
+				"endpoint": b.c.PublicURL + "/mcp/", "transport": "streamable-http", "protocolVersion": "2025-03-26",
+				"tools":         []string{"get_quote", "book_flight"},
+				"authorityHost": b.c.Supplier.AuthorityHost,
+				"x402":          map[string]any{"scheme": "exact", "network": "eip155:84532", "payTo": b.c.Pricing.PayTo, "asset": b.c.Pricing.Asset, "settlement": "none"},
+			},
+		})
+	}
+	return exts
 }
 
 // trustStackExt declares only the identity anchors this agent serves.

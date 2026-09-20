@@ -39,10 +39,15 @@ const (
 	MandateRejectedScope     Code = "MANDATE_REJECTED:scope"
 	MandateRejectedAmount    Code = "MANDATE_REJECTED:amount"
 	MandateRejectedWindow    Code = "MANDATE_REJECTED:window"
-	DPoPRejectedKey          Code = "DPOP_REJECTED:key"
-	DPoPRejectedReplay       Code = "DPOP_REJECTED:replay"
-	BookingRejectedOverlap   Code = "BOOKING_REJECTED:overlap"
-	MandateRejectedConsumed  Code = "MANDATE_REJECTED:consumed"
+	// Supplier-conformance surface (internal/supplieradapter): the same
+	// MANDATE_REJECTED / DPOP_REJECTED families the fraud battery grades on.
+	MandateRejectedUnknownKey Code = "MANDATE_REJECTED:unknown_key"
+	MandateRejectedExpired    Code = "MANDATE_REJECTED:expired"
+	PaymentRequired           Code = "PAYMENT_REQUIRED"
+	DPoPRejectedKey           Code = "DPOP_REJECTED:key"
+	DPoPRejectedReplay        Code = "DPOP_REJECTED:replay"
+	BookingRejectedOverlap    Code = "BOOKING_REJECTED:overlap"
+	MandateRejectedConsumed   Code = "MANDATE_REJECTED:consumed"
 
 	// Pass session and audit (section 9).
 	WindowClosed          Code = "WINDOW_CLOSED"
@@ -154,6 +159,9 @@ var all = []Code{
 	MandateRejectedScope,
 	MandateRejectedAmount,
 	MandateRejectedWindow,
+	MandateRejectedUnknownKey,
+	MandateRejectedExpired,
+	PaymentRequired,
 	DPoPRejectedKey,
 	DPoPRejectedReplay,
 	BookingRejectedOverlap,
