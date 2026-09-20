@@ -223,6 +223,10 @@ type peerRun struct {
 	card  []byte
 	pin   string          // hex SHA-256 of the server leaf, once attested
 	tr    *http.Transport // one pinned transport per run, closed at the end
+	// receiptOK is set only when the log entry was fetched and its SCITT
+	// receipt verified against the log's root keys; the card-hash Warn path
+	// depends on it so an unavailable log can never soften a Fail.
+	receiptOK bool
 }
 
 func (r *peerRun) add(c Check) {
@@ -261,8 +265,11 @@ func (r *peerRun) all(ctx context.Context) {
 	if !r.fetchCard(ctx) {
 		return
 	}
-	r.cardHash()
-	r.cardSignature(ctx)
+	// The signature check runs first: a card with no registered hash is
+	// tolerated only when its signature binds it to a log-attested key.
+	sig := r.cardSignature(ctx)
+	r.cardHash(sig.Verdict == Pass)
+	r.add(sig)
 }
 
 func (r *peerRun) registered(ctx context.Context) bool {
@@ -326,6 +333,7 @@ func (r *peerRun) receipt(ctx context.Context) {
 		r.add(Check{Name: CheckReceipt, Verdict: Fail, Reason: "receipt does not verify against the log's root keys: " + err.Error()})
 		return
 	}
+	r.receiptOK = true
 	r.add(Check{Name: CheckReceipt, Verdict: Pass, Detail: map[string]string{
 		"tree_size": fmt.Sprint(vr.TreeSize), "leaf_index": fmt.Sprint(vr.LeafIndex)}})
 }
@@ -519,15 +527,29 @@ func (r *peerRun) fetchCard(ctx context.Context) bool {
 	return true
 }
 
+// ReasonCardHashNotRegistered is the card_hash Warn shown by name in
+// --verify output and on the dashboard.
+const ReasonCardHashNotRegistered = "card hash: not registered; card bound by signature to log-attested key"
+
 // cardHash compares the served card with the metaDataHash the log attests.
-func (r *peerRun) cardHash() {
+// ans-cli v0.1.18 registers no metaDataHash, so "none registered" is a Warn
+// only when (1) the log entry was fetched and its SCITT receipt verified and
+// (2) card_signature passed (jku pinned to this host, kid in the trust card,
+// x5c leaf matching a log-attested identity cert). Otherwise it is a Fail: an
+// unavailable log or an unsigned card never downgrades a Fail to a Warn, and
+// a registered hash that does not match is always a Fail.
+func (r *peerRun) cardHash(signatureOK bool) {
 	sum := sha256.Sum256(r.card)
 	got := hex.EncodeToString(sum[:])
 	c := Check{Name: CheckCardHash, Detail: map[string]string{"card_sha256": got}}
 	hashes := r.token.Payload.MetadataHashes
 	switch {
+	case len(hashes) == 0 && r.receiptOK && signatureOK:
+		c.Verdict, c.Reason = Warn, ReasonCardHashNotRegistered
+	case len(hashes) == 0 && !r.receiptOK:
+		c.Verdict, c.Reason = Fail, "no metaDataHash registered and the log entry's receipt did not verify"
 	case len(hashes) == 0:
-		c.Verdict, c.Reason = Fail, "no metaDataHash registered, so the served card is not bound to the log"
+		c.Verdict, c.Reason = Fail, "no metaDataHash registered and the card signature does not bind it to a log-attested key"
 	case matchesAny(got, hashes):
 		c.Verdict = Pass
 	default:
@@ -546,7 +568,8 @@ func matchesAny(hexSum string, hashes map[string]string) bool {
 	return false
 }
 
-func (r *peerRun) cardSignature(ctx context.Context) {
+// cardSignature returns the card_signature check; the caller records it.
+func (r *peerRun) cardSignature(ctx context.Context) Check {
 	var ids []string
 	for _, e := range r.token.Payload.ValidIdentityCerts {
 		ids = append(ids, hex.EncodeToString(e.Fingerprint[:]))
@@ -565,5 +588,5 @@ func (r *peerRun) cardSignature(ctx context.Context) {
 	if len(ids) == 0 && err == nil {
 		c.Verdict, c.Reason = Fail, "status token attests no identity certificate"
 	}
-	r.add(c)
+	return c
 }

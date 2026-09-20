@@ -32,10 +32,13 @@ render() { # render <src-template> <dest>
   if [[ $APPLY -eq 1 ]]; then
     say "+ envsubst < $src > $dest"
     # Load agents.env into the environment, then expand ${VAR} in the template.
-    # The templates contain only ${KNOWN_VAR} references and no literal '$'.
     set -a; # shellcheck disable=SC1090
     . "$ENV_FILE"; set +a
-    envsubst < "$src" > "$dest"
+    # Expand ONLY the variables agents.env defines, so nginx's own $variables
+    # ($ssl_preread_server_name, $overpass_upstream) survive untouched.
+    local vars
+    vars=$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$ENV_FILE" | sed 's/=$//' | sed 's/.*/${&}/' | tr '\n' ' ')
+    envsubst "$vars" < "$src" > "$dest"
   else
     say "DRY-RUN would: envsubst < $src > $dest"
   fi
@@ -63,9 +66,14 @@ if [[ $APPLY -eq 1 && ! -f $ENV_FILE ]]; then
 fi
 say "config source: $ENV_FILE (not modified)"
 
-# 4. render per-agent configs
+# 4. render per-agent configs. AUTHORITY_CONFIG=authority-tonight renders
+# deploy/prod/authority-tonight.yaml as /etc/overpass/authority.yaml (the
+# operator allow-list variant for the first live pass); default authority.yaml.
+AUTHORITY_CONFIG=${AUTHORITY_CONFIG:-authority}
 for a in "${AGENTS[@]}"; do
-  render "$REPO_DIR/deploy/prod/$a.yaml" "/etc/overpass/$a.yaml"
+  src=$a
+  [[ $a == authority ]] && src=$AUTHORITY_CONFIG
+  render "$REPO_DIR/deploy/prod/$src.yaml" "/etc/overpass/$a.yaml"
 done
 
 # 5. systemd unit

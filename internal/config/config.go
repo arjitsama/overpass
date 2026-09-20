@@ -84,6 +84,7 @@ type Pricing struct {
 	Network        string `yaml:"network"`
 	Asset          string `yaml:"asset"`
 	AssetDecimals  int64  `yaml:"asset_decimals"` // accepts.amount = cents x 10^(decimals-2)
+	Note           string `yaml:"note"`           // plain-text note carried in the card's x-payment (e.g. "simulated; no settlement is performed")
 }
 
 // SatReg is the station's signed satellite registry and its pinned signer.

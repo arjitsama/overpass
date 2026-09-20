@@ -52,6 +52,7 @@ type xPayment struct {
 	PayTo   string `json:"payTo"`
 	Network string `json:"network,omitempty"`
 	Asset   string `json:"asset,omitempty"`
+	Note    string `json:"note,omitempty"` // e.g. "simulated; no settlement is performed"
 }
 
 type provider struct {
@@ -188,7 +189,7 @@ func (b builder) unsignedCard() agentCard {
 		XSecurityNote:      "This card declares only what the agent enforces: " + b.accessSummary() + ".",
 	}
 	if c.Role == "station" && c.Pricing.PayTo != "" {
-		card.XPayment = &xPayment{Scheme: "exact", PayTo: c.Pricing.PayTo, Network: c.Pricing.Network, Asset: c.Pricing.Asset}
+		card.XPayment = &xPayment{Scheme: "exact", PayTo: c.Pricing.PayTo, Network: c.Pricing.Network, Asset: c.Pricing.Asset, Note: c.Pricing.Note}
 	}
 	if c.Card.OrgName != "" {
 		card.Provider = &provider{Organization: c.Card.OrgName, URL: c.Card.OrgURL}

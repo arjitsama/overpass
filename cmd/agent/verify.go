@@ -24,6 +24,12 @@ func verifyPeer(ctx context.Context, cfg config.Config, host string, out io.Writ
 	dane := daneOutcome(res)
 	if res.OK() {
 		fmt.Fprintf(out, "VERIFIED %s %s (%s; DANE %s)\n", host, res.ANSName, res.Verdict, dane)
+		// Warnings are shown by name so a softened check is never silent.
+		for _, c := range res.Checks {
+			if c.Verdict == verify.Warn {
+				fmt.Fprintf(out, "  warn %s: %s\n", c.Name, c.Reason)
+			}
+		}
 		return nil
 	}
 	reason := res.Verdict

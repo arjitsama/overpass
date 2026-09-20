@@ -50,6 +50,9 @@ MAXT=${SMOKE_MAX_TIME:-4}
 # gs-sva1bard-eu is the unregistered impostor, so neither is expected to verify;
 # they are checked by the demo's refusal beat, not this gate.
 HOSTS=(ops authority gs-blacksburg gs-awarua gs-svalbard-eu gs-rogue gs-spare auditor)
+# SMOKE_HOSTS="ops authority gs-blacksburg" limits the gate to the hosts that
+# are registered so far (staged go-live); the default is every registered host.
+if [[ -n ${SMOKE_HOSTS:-} ]]; then read -r -a HOSTS <<< "$SMOKE_HOSTS"; fi
 AGENT=bin/agent
 CARDHASH=bin/cardhash
 # Optional: a config for bin/agent --verify (needs environments + trust roots).

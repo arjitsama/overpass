@@ -275,6 +275,14 @@ by design — full step-by-step in `docs/deploy-runbook.md`; the 3-minute demo i
 - The **spacecraft and the RF link are simulated** — no real radio, no real bus.
   The spacecraft is an internal process with **no public ANS identity** (not registered).
 - **No on-chain settlement**; x402 payment options are described, not executed.
+  The production station's `payTo` is the null address
+  (`0x0000000000000000000000000000000000000000`, Base Sepolia) and its card's
+  `x-payment.note` says so.
+- **The production registry does not pin `metaDataHash`** with ans-cli v0.1.18,
+  so `card_hash` reports `warn: card hash: not registered; card bound by
+  signature to log-attested key`. That Warn is allowed only when the log entry's
+  SCITT receipt verified and `card_signature` passed; otherwise it is a Fail, and
+  a registered hash that does not match is always a Fail.
 - Trust observations are **seeded** for the demo (behavior only, marked as seed
   data). We never fabricate identity or integrity scores.
 - We **run our own trust index and auditor**; in production a neutral party would.

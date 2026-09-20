@@ -15,3 +15,5 @@ certs/
 /satreg
 /cardhash
 /trustseed
+# Non-secret prod values (Agent IDs, ports) but per-deployment; keep untracked.
+deploy/agents.env

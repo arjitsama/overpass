@@ -209,7 +209,9 @@
         logLine("rejection", (d.agent || ev.subject || "") + " " + (d.code || ""));
         break;
       default:
-        logLine(ev.kind, [ev.agent, ev.subject, ev.result, ev.reason].filter(Boolean).join(" "));
+        // verify_check events name the check so a warn (e.g. card_hash: not
+        // registered) is visible by name, never a bare verdict.
+        logLine(ev.kind, [ev.agent, ev.subject, d && d.check, ev.result, ev.reason].filter(Boolean).join(" "));
     }
   }
 

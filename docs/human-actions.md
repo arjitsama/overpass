@@ -7,9 +7,9 @@ Tick an item (`[x]`) when it's done, and note when.
 
 | | Gate | What a human does | Needed before |
 | --- | --- | --- | --- |
-| [ ] | H1 | Buy the domain(s). Export `ANS_API_KEY` and `ANS_BASE_URL=https://api.godaddy.com` in the shell. | Live checks on our hosts, Phase 11 |
-| [ ] | H2 | Register each agent: `scripts/register.sh <host> --step <step> --i-am-a-human-and-this-is-permanent`, one step at a time. Production registrations are permanent. | Live checks, Phase 11 |
-| [ ] | H3 | Create the DNS records that `scripts/dns-records.sh` prints, with DNSSEC on for the zone. | Live checks |
+| [x] | H1 | Buy the domain(s). Export `ANS_API_KEY` and `ANS_BASE_URL=https://api.godaddy.com` in the shell. | Live checks on our hosts, Phase 11 |
+| [x] | H2 (Stage 1+2: ops, gs-blacksburg, authority ACTIVE 2026-09-20) | Register each agent: `scripts/register.sh <host> --step <step> --i-am-a-human-and-this-is-permanent`, one step at a time. Production registrations are permanent. | Live checks, Phase 11 |
+| [x] | H3 (via scripts/porkbun-dns.sh, 2026-09-20) | Create the DNS records that `scripts/dns-records.sh` prints, with DNSSEC on for the zone. | Live checks |
 | [ ] | H4 | Rent the VPS, add SSH access, run `deploy/install.sh`. | Phase 11 |
 | [ ] | H5 | Provide the LLM API key as an environment variable. | Phase 10 |
 | [ ] | H6 | Run `ans-cli revoke … --reason CERTIFICATE_HOLD` during the demo. | Demo |
@@ -33,7 +33,7 @@ Tick an item (`[x]`) when it's done, and note when.
   card before `verify-acme`/`verify-dns`.
 - [x] **DNS + DNSSEC live.** `ops`, `authority`, `gs-blacksburg`, root and `*`
   all resolve to `45.76.253.108`; parent DS present; no stale `_ans`/TLSA.
-- [ ] **BLOCKER — fix `ANS_API_KEY` format (H1/H2).** The value in `./.env` is a
+- [x] (fixed 2026-09-20) **BLOCKER — fix `ANS_API_KEY` format (H1/H2).** The value in `./.env` is a
   single part (no colon); `ans-cli` rejects it locally with
   `invalid API key format, expected key:secret`. GoDaddy production SSO keys are
   `Key:Secret`. Edit **line 7 of `./.env`** so the value is your GoDaddy
@@ -59,15 +59,15 @@ Tick an item (`[x]`) when it's done, and note when.
 - [ ] **Freeze each card first (master plan 5A).** Finish skill ids, tags, `payTo` and `securitySchemes`.
   Set `card.signed_file`, run `bin/agent --config <cfg> --write-card <path>`, then register with
   `metaDataHash = SHA256:<hex of that file>`. Any later card change means re-registering. (Phase 2, 3)
-- [ ] **Confirm how production computes `metaDataHash`.** The RA spec says `SHA256:<hex>` over the
+- [x] (2026-09-20: it does not; the RA stores a client-supplied hash and ans-cli v0.1.18 sends none; verifier warns by name, see docs/status/go-live.md) **Confirm how production computes `metaDataHash`.** The RA spec says `SHA256:<hex>` over the
   metadata descriptor. Our cards are served as JCS bytes, so the raw and JCS hashes agree. (Phase 2)
-- [ ] **Confirm the endpoint `transports` value for A2A on production.** ans-cli defaults to
+- [x] (JSON-RPC, 2026-09-20) **Confirm the endpoint `transports` value for A2A on production.** ans-cli defaults to
   `STREAMABLE-HTTP`; the RA spec also allows `JSON_RPC`. (Phase 3)
 - [ ] Note: `ans-cli generate-csr` defaults to an RSA server key. `register.sh` passes `--key-type ec`. (Phase 3)
 
 ## Configuration to supply
 
-- [ ] **Production log root key** in the prod environment's `root_keys`:
+- [x] (in deploy/agents.env, 2026-09-20) **Production log root key** in the prod environment's `root_keys`:
   `transparency.ans.godaddy.com+c9e2f584+…` (full value at https://transparency.ans.godaddy.com/root-keys,
   pinned in `internal/verify/live_test.go`). Without it, stations and the authority reject every
   inbound call (fail closed). (Phase 2, 3)
