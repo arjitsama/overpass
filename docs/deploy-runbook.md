@@ -148,6 +148,19 @@ For each registered host:
    ```sh
    bin/trustseed -config deploy/local/trustseed.yaml   # adapt url/ids for prod
    ```
+8. **Run one real cross-process pass** (Stage 1 proof: ops verifies gs-blacksburg,
+   the authority signs a mandate over A2A, the station books and relays). Run this
+   on the VPS (or anywhere the prod certs + ANS env resolve). It books a real pass:
+   ```sh
+   bin/opsflow -config /etc/overpass/ops.yaml \
+     -station-host gs-blacksburg.blacksburgbytes.club \
+     -station-url  https://gs-blacksburg.blacksburgbytes.club/ \
+     -authority-url https://authority.blacksburgbytes.club/ \
+     -authority-key /etc/overpass/certs/authority/identity.pub \
+     -norad 27844 -mode uplink
+   ```
+   Expect `PASS station=… quote=… mandate=… booking=… ack=accepted`. (`-insecure`
+   or `-ca <pem>` only for a local self-signed dry-run; never against production.)
 
 ## H5 — Model key
 `export ANTHROPIC_API_KEY=…` (or the systemd drop-in above) so the LLM planner

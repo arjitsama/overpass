@@ -141,16 +141,17 @@ and to match the real external APIs read at build time, per hard rule 9):
   replay a recorded event stream (`web/testdata/demo-events.json`); *Ask GoDaddy's
   agent to verify* is a real webmesh call. A fully live pass/battery run is the
   agent flow / `cmd/battery`. (Phase 9)
-- **Cross-process pass flow (Phase 12, in progress):** `internal/opsflow` now
-  drives a real pass over A2A — verify the station, quote, get a mandate from the
-  authority (`issue_mandate` over A2A, DPoP-signed), book, and relay one command —
-  with `cmd/opsflow` as its CLI and hermetic unit tests (full flow + the
-  unverified-peer-refused-before-quote ordering). **Still to land for item 1:** a
-  real-process `scripts/accept/phase-12.sh` on the local ANS stack (`../ans`) that
-  registers ops/authority/gs-blacksburg, runs them plus the spacecraft as separate
-  processes, and asserts true two-way `VerifyPeer` end to end. (Note: phase-3
-  verifies the local stack via a Go test, not runtime agent-to-agent VerifyPeer, so
-  wiring the local `environments`/root-keys into the ops+authority configs is new.)
+- **Cross-process pass flow (Phase 12):** `internal/opsflow` drives a real pass
+  over A2A — verify the station, quote, get a mandate from the authority
+  (`issue_mandate` over A2A, DPoP-signed), book, and relay one command — with
+  `cmd/opsflow` as its CLI. `scripts/accept/phase-12.sh` is a **hermetic**
+  acceptance (no `../ans`): it runs the full flow across separate HTTP listeners
+  with the real `a2a.Client`, real DPoP envelopes and an authority-signed mandate
+  verified by `schema.VerifyMandate`, and asserts an unverified peer is refused
+  **before any quote**. `bin/opsflow` is prod-runnable against real registered
+  hosts (docs/deploy-runbook.md H4.8). A four-OS-process happy path with *enforced*
+  inbound DPoP additionally needs ANS (each guard fails closed without it), so that
+  runs against the local ANS stack / real registration, not the hermetic script.
 - **Planner wiring:** the greedy and LLM planners are libraries with tests;
   `authority.Propose` is exercised in-process and now also reachable cross-process
   via the opsflow path above. An HTTP planning route on Ops is not yet wired. (Phase 10)

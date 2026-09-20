@@ -4,7 +4,7 @@ BIN := bin/agent
 TRUST_DIR := third_party/agent-trust-discovery
 
 build:
-	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery ./cmd/trustseed
+	go build -o bin/ ./cmd/agent ./cmd/cardhash ./cmd/passes ./cmd/satreg ./cmd/battery ./cmd/trustseed ./cmd/opsflow
 
 # Start the forked trust index locally on :8080 (admin auth off for the demo).
 trust-up:
