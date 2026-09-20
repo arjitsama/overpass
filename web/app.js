@@ -1,45 +1,32 @@
 // Overpass dashboard (master plan §12). No framework, no build, no external
-// requests. Renders from server-sent events and calls three Ops POST routes.
+// requests. Renders from server-sent events and the Ops JSON routes.
 // applyEvent(ev) is the single render entry point, exported for the DOM test.
+//
+// Truthfulness rule: everything on this page is either live (from /ui/agents,
+// /ui/battery-live, /ui/fraud-redteam or a live event) or carries a visible
+// "Recorded" tag with the date it was recorded. Nothing in between.
 (function (global) {
   "use strict";
 
+  var live = global.OverpassLive || (typeof require === "function" ? require("./live.js") : null);
+  var esc = live.esc, hostHTML = live.hostHTML, statusSpan = live.statusSpan;
+
   function el(id) { return global.document.getElementById(id); }
-
-  // --- status icons: inline SVG, aria-hidden; the text carries the meaning ---
-  // A distinct shape per status so meaning never rests on colour alone.
-  var ICONS = {
-    ok: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.2 11.3 3 8.1l1.1-1.1 2.1 2.1 5-5L12.3 5z"/></svg>',
-    bad: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4.5 3.4 8 6.9l3.5-3.5 1.1 1.1L9.1 8l3.5 3.5-1.1 1.1L8 9.1l-3.5 3.5-1.1-1.1L6.9 8 3.4 4.5z"/></svg>',
-    pending: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2v5l3.5 2-.8 1.3L7 10.5V3z"/></svg>',
-    cut: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 1h6l4 4v6l-4 4H5l-4-4V5zM4 7v2h8V7z"/></svg>'
-  };
-
-  function statusSpan(kind, text) {
-    var cls = kind === "ok" ? "ok" : kind === "bad" ? "bad" : kind === "cut" ? "bad" : "pending";
-    var icon = ICONS[kind] || ICONS.pending;
-    return '<span class="status ' + cls + '">' + icon + '<span class="label">' + esc(text) + "</span></span>";
-  }
-
-  function esc(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
 
   function clearEmptyRow(tbody) {
     var empty = tbody.querySelector(".empty-row");
     if (empty) { tbody.removeChild(empty); }
   }
 
-  // --- dimension cell: "Integrity 89 of 100" + a meter, or "no signal" ---
-  function dimCell(name, value) {
-    if (value == null) {
-      return '<td><span class="no-signal">no signal registered</span></td>';
-    }
-    var v = Number(value);
-    return '<td><span class="meter-cell"><span>' + esc(name) + " " + v + " of 100</span>" +
-      '<meter min="0" max="100" value="' + v + '" aria-hidden="true"></meter></span></td>';
+  function clearRows(tbody) {
+    while (tbody.children.length) { tbody.removeChild(tbody.children[0]); }
+  }
+
+  // A recorded row says so, with the date it was recorded.
+  function recordedTag(d) {
+    if (!d || !d.recorded) { return ""; }
+    var when = d.recorded_at ? " " + esc(d.recorded_at) : "";
+    return ' <span class="tag recorded">Recorded' + when + "</span>";
   }
 
   // --- renderers ------------------------------------------------------------
@@ -52,40 +39,82 @@
       : d.status === "rejected" ? statusSpan("bad", "Rejected")
       : statusSpan("pending", d.status || "Pending");
     tr.innerHTML =
-      "<td>" + esc(d.station) + "</td>" +
-      "<td>" + esc(d.mode) + "</td>" +
-      "<td>" + esc(d.aos) + "</td>" +
-      "<td>" + esc(d.los) + "</td>" +
-      "<td>" + esc(d.max_elevation_deg != null ? d.max_elevation_deg + "°" : "—") + "</td>" +
-      "<td>" + esc(d.tier || "—") + "</td>" +
-      "<td>" + status + "</td>";
+      "<td>" + hostHTML(d.station) + recordedTag(d) + "</td>" +
+      '<td class="nowrap">' + esc(d.mode) + "</td>" +
+      '<td class="nowrap">' + esc(d.aos) + "</td>" +
+      '<td class="nowrap">' + esc(d.los) + "</td>" +
+      '<td class="nowrap">' + esc(d.max_elevation_deg != null ? d.max_elevation_deg + "°" : "—") + "</td>" +
+      '<td class="nowrap">' + status + "</td>";
     tbody.appendChild(tr);
   }
 
-  function renderAgent(d) {
+  // One chip per verification check. The check's name is always shown, so a
+  // warn (card_hash: not registered) is visible by name, never a bare pass.
+  function checkChips(checks) {
+    if (!checks || !checks.length) { return '<span class="muted">no checks recorded</span>'; }
+    var html = '<span class="chips">';
+    for (var i = 0; i < checks.length; i++) {
+      var c = checks[i], v = String(c.verdict || "").toLowerCase();
+      var word = v === "pass" ? "Pass" : v === "warn" ? "Warn" : v === "fail" ? "Fail" : v === "skip" ? "Skipped" : esc(c.verdict);
+      html += '<span class="chip ' + esc(v) + '"><span class="k">' + esc(c.name) + "</span> " + word + "</span>";
+    }
+    return html + "</span>";
+  }
+
+  function agentVerdictCell(a) {
+    if (a.deployed === false) { return statusSpan("pending", "Not deployed"); }
+    if (a.verified) {
+      var warned = (a.checks || []).some(function (c) { return String(c.verdict).toLowerCase() === "warn"; });
+      return statusSpan(warned ? "warn" : "ok", warned ? "Verified with warnings" : "Verified");
+    }
+    return statusSpan("bad", "Failed" + (a.reason ? ": " + a.reason : ""));
+  }
+
+  // renderAgents replaces the whole table from one live snapshot (GET /ui/agents
+  // or the "agents" event the Ops poller publishes). There is no trust index in
+  // production, so no scores and no tier are shown — the access decision is the
+  // authority's flight rules, stated in words.
+  function renderAgents(payload) {
     var tbody = el("agents-body");
-    if (!tbody) { return; }
-    clearEmptyRow(tbody);
-    var tr = global.document.createElement("tr");
-    var verif = d.verified ? statusSpan("ok", "Verified")
-      : statusSpan("bad", "Rejected" + (d.reason ? ": " + d.reason : ""));
-    // Show the DANE outcome by name (Verified / Skipped / NoRecords / Mismatch),
-    // never a bare pass. Skipped/NoRecords are warnings that still verify.
-    if (d.dane) { verif += ' <span class="muted">DANE ' + esc(d.dane) + "</span>"; }
-    tr.innerHTML =
-      "<td>" + esc(d.name || d.ans) + "</td>" +
-      "<td>" + verif + "</td>" +
-      dimCell("Integrity", d.integrity) +
-      dimCell("Identity", d.identity) +
-      dimCell("Solvency", d.solvency) +
-      dimCell("Behavior", d.behavior) +
-      dimCell("Safety", d.safety) +
-      "<td>" + esc(d.tier || "—") + "</td>";
-    tbody.appendChild(tr);
+    if (!tbody || !payload) { return; }
+    var agents = payload.agents || [];
+    // A recorded replay carries its stamp on the snapshot, not on each agent.
+    // Push it down so every row it draws is labelled: a replay overwrites the
+    // live table, and an unlabelled row would read as a live verification.
+    var stamp = payload.recorded ? { recorded: true, recorded_at: payload.recorded_at } : null;
+    clearRows(tbody);
+    if (!agents.length) {
+      var none = global.document.createElement("tr");
+      none.className = "empty-row";
+      none.innerHTML = '<td colspan="5">No agents checked yet.</td>';
+      tbody.appendChild(none);
+    }
+    for (var i = 0; i < agents.length; i++) {
+      var a = agents[i];
+      var tr = global.document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + hostHTML(a.host) + recordedTag(stamp || a) + "</td>" +
+        '<td class="nowrap">' + esc(a.role || "—") + "</td>" +
+        "<td>" + agentVerdictCell(a) + "</td>" +
+        '<td class="nowrap">' + esc(a.dane || "—") + "</td>" +
+        "<td>" + checkChips(a.checks) + "</td>";
+      tbody.appendChild(tr);
+    }
+    var note = el("agents-note");
+    if (note) {
+      note.textContent = "Trust index: " + (payload.trust_index || "not deployed") + ". " +
+        (payload.access_basis || "Uplink: operator allow-list (flight rules)") + ".";
+    }
+    var when = el("agents-checked");
+    if (when) {
+      when.textContent = stamp ? "Recorded " + payload.recorded_at + " — not a live check."
+        : payload.checked_at ? "Last checked: " + payload.checked_at
+          : "Not checked yet.";
+    }
   }
 
   function renderActivePass(d) {
-    if (d.station != null) { setText("ap-station", d.station); }
+    if (d.station != null) { setHTML("ap-station", hostHTML(d.station) + recordedTag(d)); }
     if (d.session_state != null) {
       var kind = d.session_state === "active" ? "ok" : d.session_state === "cut" ? "cut" : "pending";
       setHTML("ap-state", statusSpan(kind, d.session_state));
@@ -95,21 +124,56 @@
     if (d.countdown_s != null) { startCountdown(Number(d.countdown_s)); }
   }
 
-  function renderBattery(d) {
-    var tbody = el("battery-body");
-    if (!tbody) { return; }
-    clearEmptyRow(tbody);
+  function batteryRow(d) {
     var tr = global.document.createElement("tr");
     var v = String(d.verdict || "").toUpperCase();
     var status = v === "BLOCKED" ? statusSpan("ok", "Blocked")
       : v === "VULNERABLE" ? statusSpan("bad", "Vulnerable")
       : statusSpan("pending", d.verdict || "Inconclusive");
     tr.innerHTML =
-      "<td>" + esc(d.name) + "</td>" +
-      "<td>" + status + "</td>" +
-      "<td>" + esc(d.observed || "—") + "</td>" +
+      "<td>" + esc(d.name) + recordedTag(d) + "</td>" +
+      '<td class="nowrap">' + status + "</td>" +
+      '<td class="nowrap">' + esc(d.observed || "—") + "</td>" +
       "<td>" + esc(d.detail || "") + "</td>";
-    tbody.appendChild(tr);
+    return tr;
+  }
+
+  // Recorded battery rows go to their own table inside the Recorded replay
+  // group; the live table above is never mixed with them.
+  function renderBattery(d) {
+    var tbody = el(d && d.recorded ? "battery-recorded-body" : "battery-body");
+    if (!tbody) { return; }
+    clearEmptyRow(tbody);
+    tbody.appendChild(batteryRow(d));
+  }
+
+  // The last live run of bin/battery against production, as recorded in
+  // docs/status/battery-live.json. Every row is shown, not a selection.
+  function renderBatteryLive(payload) {
+    var tbody = el("battery-body");
+    if (!tbody || !payload) { return; }
+    clearRows(tbody);
+    var results = payload.results || [];
+    for (var i = 0; i < results.length; i++) { tbody.appendChild(batteryRow(results[i])); }
+    var head = el("battery-live-summary");
+    if (!head) { return; }
+    if (!results.length) {
+      head.textContent = "No live run recorded yet.";
+      return;
+    }
+    var target = (payload.target && payload.target.station_host) || "the production station";
+    head.textContent = "Last live run: " + (payload.ran_at || "unknown") + " against " + target +
+      " — " + payload.blocked + " of " + payload.total + " blocked" +
+      (payload.inconclusive ? ", " + payload.inconclusive + " inconclusive" : "") +
+      (payload.vulnerable ? ", " + payload.vulnerable + " vulnerable" : "") + ".";
+  }
+
+  // GoDaddy's fraud agent: shown only from docs/status/fraud-redteam.md, with
+  // that file's own status line. No verdict is claimed here.
+  function renderFraud(payload) {
+    var line = el("fraud-line");
+    if (!line || !payload) { return; }
+    line.textContent = payload.status_line || "No GoDaddy fraud-agent results recorded.";
   }
 
   // Neutral wording for GoDaddy's evidence states: "absent" and
@@ -172,15 +236,37 @@
         ", transparency log " + stateWord(ev2.tl)[1] + ", DNSSEC " + stateWord(ev2.dnssec)[1] + ".";
     }
     logLine("verification", sentence);
-    if (host) { alertMsg(sentence); }
+    setText("hero-godaddy", ok ? "Verified" : "Not verified");
   }
 
+  // --- alerts ---------------------------------------------------------------
+  // Session cuts and rejections only, never connection state. Repeats are
+  // dropped and the region is capped, so a flapping condition cannot bury the
+  // page under identical paragraphs.
+  // #alert-region holds paragraphs only; the dismiss button is a sibling, so
+  // the cap below cannot evict it. A message already on show is never repeated,
+  // however often its condition recurs.
+  var ALERT_MAX = 3;
   function alertMsg(msg) {
     var region = el("alert-region");
     if (!region) { return; }
+    for (var i = 0; i < region.children.length; i++) {
+      if (region.children[i].textContent === msg) { return; }
+    }
+    while (region.children.length >= ALERT_MAX) { region.removeChild(region.children[0]); }
     var p = global.document.createElement("p");
     p.textContent = msg;
     region.appendChild(p);
+  }
+
+  function wireDismiss() {
+    var btn = el("alert-dismiss");
+    var region = el("alert-region");
+    if (!btn || !region) { return; }
+    btn.addEventListener("click", function () {
+      while (region.children.length) { region.removeChild(region.children[0]); }
+      btn.hidden = true;
+    });
   }
 
   // Recorded-replay banner: visible and announced (role=status) while a recorded
@@ -199,6 +285,7 @@
     }
   }
 
+  var LOG_MAX = 200;
   function logLine(kind, text) {
     var logEl = el("event-log");
     if (!logEl) { return; }
@@ -206,6 +293,7 @@
     line.className = "log-line";
     line.textContent = "[" + kind + "] " + text;
     logEl.appendChild(line);
+    while (logEl.children.length > LOG_MAX) { logEl.removeChild(logEl.children[0]); }
     logEl.scrollTop = logEl.scrollHeight;
   }
 
@@ -246,8 +334,11 @@
     if (!ev || !ev.kind) { return; }
     var d = ev.data || {};
     switch (ev.kind) {
+      case "recording":
+        showReplayBanner("Recorded replay of " + (d.recorded_at || "an earlier run") + " — not a live pass.");
+        break;
       case "pass": renderPass(d); break;
-      case "agent": renderAgent(d); break;
+      case "agents": renderAgents(d); break;
       case "active_pass": renderActivePass(d); break;
       case "battery": renderBattery(d); break;
       case "verification": renderVerification(d); break;
@@ -268,33 +359,8 @@
         // registered) is visible by name, never a bare verdict.
         logLine(ev.kind, [ev.agent, ev.subject, d && d.check, ev.result, ev.reason].filter(Boolean).join(" "));
     }
-  }
-
-  // --- theme ---------------------------------------------------------------
-  function initTheme(doc, win) {
-    var root = doc.documentElement;
-    var stored = null;
-    try { stored = win.localStorage.getItem("overpass-theme"); } catch (e) { stored = null; }
-    if (stored === "contrast") {
-      root.setAttribute("data-theme", "contrast");
-    } else if (win.matchMedia && win.matchMedia("(prefers-contrast: more)").matches) {
-      root.setAttribute("data-theme", "contrast");
-    } else if (win.matchMedia && win.matchMedia("(prefers-color-scheme: dark)").matches) {
-      root.setAttribute("data-theme", "dark");
-    }
-    var toggle = doc.getElementById("contrast-toggle");
-    if (!toggle) { return; }
-    var on = root.getAttribute("data-theme") === "contrast";
-    toggle.setAttribute("aria-pressed", on ? "true" : "false");
-    toggle.addEventListener("click", function () {
-      var nowOn = root.getAttribute("data-theme") !== "contrast";
-      // Turning contrast off restores the OS base theme (dark or light), not
-      // an unconditional light, so a dark-mode user is not forced to light.
-      var base = (win.matchMedia && win.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "";
-      root.setAttribute("data-theme", nowOn ? "contrast" : base);
-      toggle.setAttribute("aria-pressed", nowOn ? "true" : "false");
-      try { win.localStorage.setItem("overpass-theme", nowOn ? "contrast" : "base"); } catch (e) { /* ignore */ }
-    });
+    var btn = el("alert-dismiss");
+    if (btn && el("alert-region") && el("alert-region").children.length) { btn.hidden = false; }
   }
 
   // --- routes --------------------------------------------------------------
@@ -303,11 +369,15 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body || {})
-    }).then(function (r) {
-      return r.text().then(function (t) {
-        if (!r.ok) { throw new Error(t || r.status); }
-        return t ? JSON.parse(t) : {};
-      });
+    }).then(readJSON);
+  }
+
+  function get(path) { return global.fetch(path).then(readJSON); }
+
+  function readJSON(r) {
+    return r.text().then(function (t) {
+      if (!r.ok) { throw new Error(t || r.status); }
+      return t ? JSON.parse(t) : {};
     });
   }
 
@@ -319,16 +389,29 @@
       if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
       run().catch(function (e) {
         if (errEl) { errEl.hidden = false; errEl.textContent = "Failed: " + e.message; }
-        alertMsg("Action failed: " + e.message);
       });
     });
+  }
+
+  function loadAgents() {
+    return get("/ui/agents").then(renderAgents).catch(function () { /* shown as "not checked yet" */ });
   }
 
   function init() {
     var doc = global.document, win = global;
     if (!doc) { return; }
-    initTheme(doc, win);
+    live.initTheme(doc, win);
+    wireDismiss();
 
+    loadAgents();
+    get("/ui/battery-live").then(renderBatteryLive).catch(function () {
+      setText("battery-live-summary", "No live run recorded yet.");
+    });
+    get("/ui/fraud-redteam").then(renderFraud).catch(function () { /* line stays as authored */ });
+
+    wireButton("btn-refresh-agents", "agents-err", function () {
+      return post("/ui/refresh-agents", {}).then(loadAgents);
+    });
     wireButton("btn-demo", "demo-err", function () {
       showReplayBanner("Recorded replay: showing recorded demo data, not a live pass.");
       return post("/ui/run-demo-pass", {}).then(hideReplayBannerSoon);
@@ -363,22 +446,20 @@
         post("/ui/simulate-compromise", { on: arming }).then(function () {
           compromise.setAttribute("aria-pressed", arming ? "true" : "false");
           compromise.textContent = arming ? "Reset compromise" : "Simulate compromise";
-          alertMsg(arming ? "Simulated compromise armed (test control): session cut, re-planning."
-            : "Simulated compromise reset (test control).");
-        }).catch(function (e) { alertMsg("Simulate compromise failed: " + e.message); });
+        }).catch(function (e) {
+          var errEl = el("compromise-err");
+          if (errEl) { errEl.hidden = false; errEl.textContent = "Failed: " + e.message; }
+        });
       });
     }
 
-    if (typeof win.EventSource === "function") {
-      var es = new win.EventSource("/events");
-      es.onmessage = function (m) {
-        try { applyEvent(JSON.parse(m.data)); } catch (e) { /* ignore malformed */ }
-      };
-      es.onerror = function () { alertMsg("Live connection lost; retrying."); };
-    }
+    live.connectEvents(doc, win, applyEvent);
   }
 
-  var api = { applyEvent: applyEvent, init: init };
+  var api = {
+    applyEvent: applyEvent, init: init,
+    renderAgents: renderAgents, renderBatteryLive: renderBatteryLive, renderVerification: renderVerification
+  };
   global.Overpass = api;
   if (typeof module !== "undefined" && module.exports) { module.exports = api; }
   if (global.document && global.addEventListener) {

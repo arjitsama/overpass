@@ -8,16 +8,20 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/arjitsama/overpass/internal/bus"
 	"github.com/arjitsama/overpass/internal/config"
 )
 
 func opsAgent() *agent {
+	cfg := config.Config{Role: "ops", Host: "ops.example"}
+	cfg.ApplyDefaults()
 	return &agent{
-		cfg: config.Config{Role: "ops", Host: "ops.example"},
+		cfg: cfg,
 		bus: bus.New(bus.DefaultBacklog, bus.DefaultMaxSubs),
 		log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		now: time.Now,
 	}
 }
 
@@ -30,11 +34,15 @@ func TestUIRunDemoPass(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 	var out struct {
-		Replayed int `json:"replayed"`
+		Replayed   int    `json:"replayed"`
+		RecordedAt string `json:"recorded_at"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	if out.Replayed < 5 {
 		t.Errorf("replayed = %d, want the recorded stream", out.Replayed)
+	}
+	if out.RecordedAt == "" {
+		t.Error("replay must report when the stream was recorded")
 	}
 	// GET is refused.
 	rec = httptest.NewRecorder()
@@ -58,6 +66,13 @@ func TestUIRunBatteryReturnsResults(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	if len(out.Results) < 2 {
 		t.Errorf("results = %d, want the recorded battery rows", len(out.Results))
+	}
+	// Every replayed row is stamped, so the page can label it and no recorded
+	// result can be read as a live run.
+	for i, r := range out.Results {
+		if r["recorded"] != true || r["recorded_at"] == "" {
+			t.Errorf("result %d is not stamped as recorded: %v", i, r)
+		}
 	}
 }
 

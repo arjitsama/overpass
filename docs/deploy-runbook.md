@@ -161,6 +161,61 @@ For each registered host:
    ```
    Expect `PASS station=… quote=… mandate=… booking=… ack=accepted`. (`-insecure`
    or `-ca <pem>` only for a local self-signed dry-run; never against production.)
+9. **Record one live attack battery** so the dashboard shows a real run rather
+   than a recorded replay. Every attack is one A2A call the station and
+   spacecraft must refuse; nothing is written to ANS:
+   ```sh
+   battery run -config /etc/overpass/battery-live.yaml \
+     -record /etc/overpass/battery-live
+   ```
+   Copy `/etc/overpass/battery-live.{json,md}` into `docs/status/` and commit
+   them; `deploy/install.sh` puts the JSON back on the box for the dashboard's
+   `/ui/battery-live` route. Only three agents are registered in production, so
+   `wrong_dpop_key_attack` reports **INCONCLUSIVE** ("needs a second registered
+   Ops identity") — it is reported, never counted as blocked.
+
+## H4b — Bare domain (apex + www) → the dashboard
+
+`blacksburgbytes.club` and `www.blacksburgbytes.club` are **not agents**: they
+have no ANS identity and no ANS-issued certificate. They get an ordinary Let's
+Encrypt certificate and redirect to `https://ops.<domain>/ui/`, so a plain
+browser reaches the dashboard without a name mismatch. **No agent's certificate,
+DNS record or registration is touched.**
+
+1. Point both names' A records at the VPS (Porkbun) and open port 80:
+   ```sh
+   sudo ufw allow 80/tcp
+   sudo apt-get install -y certbot
+   ```
+2. Add `WEB_PORT=8480` to `/etc/overpass/agents.env`, then run the installer.
+   With no certificate yet it renders only the port-80 ACME + redirect server
+   and removes nginx's stock `sites-enabled/default` (which would shadow ours):
+   ```sh
+   sudo deploy/install.sh --apply
+   ```
+3. Issue the certificate over the webroot the installer just created:
+   ```sh
+   sudo certbot certonly --webroot -w /var/www/acme \
+     -d blacksburgbytes.club -d www.blacksburgbytes.club \
+     --agree-tos -m <email> -n --deploy-hook 'systemctl reload nginx'
+   ```
+   Webroot (not `--standalone`) is deliberate: renewal keeps working with port 80
+   occupied by our own redirect server, and no Porkbun API key ever goes on the
+   box. Confirm renewal: `sudo certbot renew --dry-run`.
+4. Re-run the installer so the TLS redirect server is rendered now the
+   certificate exists, then reload:
+   ```sh
+   sudo deploy/install.sh --apply
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+5. Verify from a machine with a stock curl — four chains, no `-k`:
+   ```sh
+   curl -sI  http://blacksburgbytes.club/          # 301 -> https://blacksburgbytes.club/
+   curl -sIL https://blacksburgbytes.club/         # 302 -> https://ops…/ui/ -> 200
+   curl -sI  http://www.blacksburgbytes.club/
+   curl -sIL https://www.blacksburgbytes.club/
+   scripts/smoke.sh blacksburgbytes.club --gate    # the agents are unaffected
+   ```
 
 ## H5 — Model key
 `export ANTHROPIC_API_KEY=…` (or the systemd drop-in above) so the LLM planner

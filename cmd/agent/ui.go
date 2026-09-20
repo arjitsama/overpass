@@ -25,6 +25,10 @@ func (a *agent) mountUI(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/verify-station", a.uiVerifyStation)
 	mux.HandleFunc("/ui/run-battery", a.uiRunBattery)
 	mux.HandleFunc("/ui/simulate-compromise", a.uiSimulateCompromise)
+	mux.HandleFunc("/ui/agents", a.uiAgentsSnapshot)
+	mux.HandleFunc("/ui/refresh-agents", a.uiRefreshAgents)
+	mux.HandleFunc("/ui/battery-live", a.uiBatteryLive)
+	mux.HandleFunc("/ui/fraud-redteam", a.uiFraudRedteam)
 }
 
 // uiSimulateCompromise is the dashboard's repeatable, resettable session-cut
@@ -79,6 +83,33 @@ type uiEvent struct {
 	Data    map[string]any `json:"data"`
 }
 
+// recordedAt returns the recording date the fixture declares in its leading
+// "recording" event, so every replayed row can be stamped with it.
+func recordedAt(evs []uiEvent) string {
+	for _, e := range evs {
+		if e.Kind == "recording" && e.Data != nil {
+			if s, ok := e.Data["recorded_at"].(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// markRecorded stamps one replayed event's data, so the dashboard can label it
+// and no recorded row can be mistaken for a live one.
+func markRecorded(d map[string]any, when string) map[string]any {
+	out := make(map[string]any, len(d)+2)
+	for k, v := range d {
+		out[k] = v
+	}
+	out["recorded"] = true
+	if when != "" {
+		out["recorded_at"] = when
+	}
+	return out
+}
+
 func uiPost(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
@@ -100,10 +131,12 @@ func (a *agent) uiRunDemoPass(w http.ResponseWriter, r *http.Request) {
 		errs.Write(w, http.StatusInternalServerError, errs.Internal, "demo events unreadable")
 		return
 	}
+	when := recordedAt(evs)
 	for _, e := range evs {
-		_, _ = a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: e.Kind, Subject: e.Subject, Reason: e.Reason, Data: e.Data})
+		_, _ = a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: e.Kind, Subject: e.Subject, Reason: e.Reason,
+			Data: markRecorded(e.Data, when)})
 	}
-	writeJSON(w, map[string]any{"replayed": len(evs)})
+	writeJSON(w, map[string]any{"replayed": len(evs), "recorded_at": when})
 }
 
 // uiVerifyStation calls GoDaddy's agent (the Phase 3 webmesh client) to verify a
@@ -151,14 +184,16 @@ func (a *agent) uiRunBattery(w http.ResponseWriter, r *http.Request) {
 		errs.Write(w, http.StatusInternalServerError, errs.Internal, "demo events unreadable")
 		return
 	}
+	when := recordedAt(evs)
 	results := make([]map[string]any, 0)
 	for _, e := range evs {
 		if e.Kind == "battery" {
-			a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: "battery", Subject: e.Subject, Data: e.Data})
-			results = append(results, e.Data)
+			d := markRecorded(e.Data, when)
+			a.bus.Publish(bus.Event{Agent: a.cfg.Host, Kind: "battery", Subject: e.Subject, Data: d})
+			results = append(results, d)
 		}
 	}
-	writeJSON(w, map[string]any{"results": results})
+	writeJSON(w, map[string]any{"results": results, "recorded_at": when})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

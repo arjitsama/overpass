@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 
@@ -291,11 +292,45 @@ type Config struct {
 	UI             UICfg                  `yaml:"ui"`
 }
 
-// UICfg configures the Ops dashboard's three POST routes (master plan §12).
+// UICfg configures the Ops dashboard's routes (master plan §12).
 type UICfg struct {
 	WebmeshURL string `yaml:"webmesh_url"` // GoDaddy's agent MCP endpoint for verify-station
 	VerifyHost string `yaml:"verify_host"` // default station FQDN the verify button checks
+
+	// Agents are the peers the dashboard verifies live, in display order.
+	Agents []UIAgent `yaml:"agents"`
+	// RefreshEvery is how often the live verification poller re-runs.
+	// Zero means DefaultAgentRefresh.
+	RefreshEvery time.Duration `yaml:"refresh_every"`
+	// AccessBasis states, in plain language, what actually grants uplink. It is
+	// the authority's flight rules, not a trust score.
+	AccessBasis string `yaml:"access_basis"`
+	// TrustIndexNote is shown wherever scores would otherwise be. Production
+	// runs no trust index, so the dashboard says so rather than showing a tier.
+	TrustIndexNote string `yaml:"trust_index_note"`
+	// BatteryLiveFile is the JSON record of the last live battery run
+	// (bin/battery -record). Absent means no live run has been recorded.
+	BatteryLiveFile string `yaml:"battery_live_file"`
+	// FraudRedteamFile is docs/status/fraud-redteam.md. GoDaddy fraud-agent
+	// results are shown from this file only.
+	FraudRedteamFile string `yaml:"fraud_redteam_file"`
 }
+
+// DefaultAgentRefresh matches the verifier's status-token max age, so tokens
+// are refreshed exactly as they go stale.
+const DefaultAgentRefresh = 10 * time.Minute
+
+// UIAgent is one agent shown on the dashboard. Role is display text; the
+// dashboard never infers a role from a hostname. Deployed false means the agent
+// is registered but not running in production: it is labelled, never verified.
+type UIAgent struct {
+	Host     string `yaml:"host"`
+	Role     string `yaml:"role"`
+	Deployed *bool  `yaml:"deployed"`
+}
+
+// IsDeployed reports whether the agent should be verified live (default true).
+func (a UIAgent) IsDeployed() bool { return a.Deployed == nil || *a.Deployed }
 
 // Load reads path, applies env overrides and defaults, and validates.
 func Load(path string) (Config, error) {
@@ -401,6 +436,15 @@ func (c *Config) ApplyDefaults() {
 	}
 	if _, ok := c.Environments[ProdEnv]; !ok {
 		c.Environments[ProdEnv] = Environment{RegistryURL: c.RegistryURL, LogURL: c.LogURL, RootKeys: c.TrustRoots}
+	}
+	if c.UI.RefreshEvery <= 0 {
+		c.UI.RefreshEvery = DefaultAgentRefresh
+	}
+	if c.UI.AccessBasis == "" {
+		c.UI.AccessBasis = "Uplink: operator allow-list (flight rules)"
+	}
+	if c.UI.TrustIndexNote == "" {
+		c.UI.TrustIndexNote = "not deployed"
 	}
 }
 

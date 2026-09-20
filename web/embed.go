@@ -1,5 +1,5 @@
-// Package web serves the Overpass dashboard: three static files (index.html,
-// app.js, styles.css) with no framework, no build step, and no external
+// Package web serves the Overpass dashboard: static files (index.html, app.js,
+// live.js, styles.css) with no framework, no build step, and no external
 // requests (master plan §12). The Ops agent mounts Handler() under /ui/.
 package web
 
@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-//go:embed index.html app.js styles.css
+//go:embed index.html app.js live.js styles.css
 var assets embed.FS
 
 //go:embed testdata/demo-events.json

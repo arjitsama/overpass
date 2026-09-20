@@ -1,0 +1,39 @@
+# Bare domain -> the dashboard (http{} context).
+#
+# blacksburgbytes.club and www.blacksburgbytes.club are not agents: they have no
+# ANS identity and no ANS-issued certificate. They get an ordinary Let's Encrypt
+# certificate and redirect to the dashboard, so a plain browser reaches it
+# without a name mismatch.
+#
+# The agents are untouched: each still terminates its OWN ANS-issued cert behind
+# the SNI passthrough in nginx-sni.conf.template. Only the two bare names are
+# mapped here, to ${WEB_PORT} on loopback.
+#
+# deploy/install.sh renders this once /etc/letsencrypt/live/${BASE_DOMAIN}/
+# fullchain.pem exists; before that it renders nginx-web-bootstrap.conf.template.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${BASE_DOMAIN} www.${BASE_DOMAIN};
+
+    # Kept so `certbot renew` (webroot) works with port 80 in use.
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 127.0.0.1:${WEB_PORT} ssl;
+    http2 on;
+    server_name ${BASE_DOMAIN} www.${BASE_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${BASE_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${BASE_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    return 302 https://ops.${BASE_DOMAIN}/ui/;
+}

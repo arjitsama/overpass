@@ -40,12 +40,14 @@ Object.defineProperty(Node.prototype, "scrollHeight", { get: function () { retur
 
 // The ids app.js looks up, pre-registered like the real index.html would supply.
 var IDS = [
-  "sat-name", "norad-id", "contrast-toggle",
-  "btn-demo", "btn-verify", "btn-battery",
-  "demo-err", "verify-err", "battery-err",
+  "sat-name", "norad-id", "contrast-toggle", "live-status",
+  "btn-demo", "btn-verify", "btn-battery", "btn-refresh-agents",
+  "demo-err", "verify-err", "battery-err", "agents-err", "compromise-err",
   "ap-station", "ap-countdown", "ap-countdown-a11y", "ap-state", "ap-token", "ap-ack",
-  "schedule-body", "agents-body", "battery-body", "battery-results-h",
-  "event-log", "alert-region", "timeline",
+  "schedule-body", "agents-body", "agents-note", "agents-checked",
+  "battery-body", "battery-recorded-body", "battery-results-h", "battery-live-summary",
+  "fraud-line", "hero-godaddy",
+  "event-log", "alert-region", "alert-dismiss", "replay-banner",
   "verify-card",
   "verify-section",
   "btn-verify-impostor"

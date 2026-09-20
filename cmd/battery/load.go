@@ -52,63 +52,91 @@ type batteryConfig struct {
 	OtherName    string   `yaml:"other_authority_ans"`
 }
 
-// load builds a Battery from the config file, returning a cleanup func.
-func load(ctx context.Context, path string) (*battery.Battery, func(), error) {
+// load builds a Battery from the config file, returning what it targets and a
+// cleanup func.
+func load(ctx context.Context, path string) (*battery.Battery, Target, func(), error) {
+	var target Target
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, target, nil, err
 	}
 	var c batteryConfig
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	if err := dec.Decode(&c); err != nil {
-		return nil, nil, fmt.Errorf("battery config: %w", err)
+		return nil, target, nil, fmt.Errorf("battery config: %w", err)
 	}
+	target = Target{StationHost: c.StationHost, StationANS: c.StationANS,
+		StationURL: c.StationURL, SpacecraftURL: c.SpacecraftURL}
 	v, err := verify.New(config.Config{Environments: c.Environments}, verify.Options{Self: "battery"})
 	if err != nil {
-		return nil, nil, err
+		return nil, target, nil, err
 	}
 	hc, err := c.httpClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, target, nil, err
 	}
 	out1, stop1, err := outbound(ctx, v, c.Ops)
 	if err != nil {
-		return nil, nil, err
+		return nil, target, nil, err
 	}
-	out2, stop2, err := outbound(ctx, v, c.OpsWrong)
-	if err != nil {
-		stop1()
-		return nil, nil, err
+	stops := []func(){stop1}
+	stopAll := func() {
+		for _, s := range stops {
+			s()
+		}
+	}
+	// A second registered identity is a deployment fact, not a given: only
+	// three agents are registered in production. Without one, the attacks that
+	// need it report INCONCLUSIVE with the reason rather than being skipped
+	// silently or counted as blocked.
+	var out2 *verify.Outbound
+	if c.OpsWrong.KeyFile != "" {
+		o, stop2, err := outbound(ctx, v, c.OpsWrong)
+		if err != nil {
+			stopAll()
+			return nil, target, nil, err
+		}
+		out2, stops = o, append(stops, stop2)
 	}
 	opsKey, err := readPrivateKey(c.Ops.KeyFile)
 	if err != nil {
-		stop1()
-		stop2()
-		return nil, nil, err
+		stopAll()
+		return nil, target, nil, err
 	}
 	authKey, err := readPrivateKey(c.AuthKeyFile)
 	if err != nil {
-		stop1()
-		stop2()
-		return nil, nil, err
+		stopAll()
+		return nil, target, nil, err
 	}
-	otherKey, err := readPrivateKey(c.OtherKeyFile)
-	if err != nil {
-		stop1()
-		stop2()
-		return nil, nil, err
+	// An unconfigured second authority is an untrusted key, which is exactly
+	// what the not_owner attack needs; the target must refuse it either way.
+	otherKey := mustEphemeralKey()
+	if c.OtherKeyFile != "" {
+		otherKey, err = readPrivateKey(c.OtherKeyFile)
+		if err != nil {
+			stopAll()
+			return nil, target, nil, err
+		}
 	}
-	wrong2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	unknown, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	b := &battery.Battery{
 		HTTP: hc, StationURL: c.StationURL, StationANS: c.StationANS, StationHost: c.StationHost,
 		SpaceURL: c.SpacecraftURL, Ops: out1, OpsANS: c.Ops.ANSName, OpsJKT: out1.JKT(), OpsKey: opsKey,
-		OpsWrong: out2, OpsWrong2: wrong2, AuthKey: authKey, AuthName: c.AuthName,
-		OtherAuthKey: otherKey, OtherAuthName: c.OtherName, UnknownKey: unknown,
+		OpsWrong: out2, OpsWrong2: mustEphemeralKey(), AuthKey: authKey, AuthName: c.AuthName,
+		OtherAuthKey: otherKey, OtherAuthName: c.OtherName, UnknownKey: mustEphemeralKey(),
 		NoradID: c.NoradID, OtherStation: c.OtherStation, Now: time.Now,
 	}
-	return b, func() { stop1(); stop2() }, nil
+	return b, target, stopAll, nil
+}
+
+// mustEphemeralKey returns a throwaway P-256 key. These stand in for keys the
+// target does not trust; generation cannot fail with a working RNG.
+func mustEphemeralKey() *ecdsa.PrivateKey {
+	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic("battery: no entropy for an ephemeral key: " + err.Error())
+	}
+	return k
 }
 
 func outbound(ctx context.Context, v *verify.Verifier, id identity) (*verify.Outbound, func(), error) {

@@ -1,0 +1,22 @@
+# Bare domain, before a certificate exists (http{} context).
+#
+# This is the bootstrap half of deploy/nginx-web.conf.template: port 80 only, so
+# certbot's webroot challenge can be answered. deploy/install.sh renders THIS
+# file while /etc/letsencrypt/live/${BASE_DOMAIN}/fullchain.pem is missing, and
+# the full template once it exists.
+#
+# The ACME location stays in both, so `certbot renew` keeps working with port 80
+# occupied by the redirect below.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${BASE_DOMAIN} www.${BASE_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

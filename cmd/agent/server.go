@@ -25,15 +25,17 @@ const (
 )
 
 type agent struct {
-	cfg   config.Config
-	bus   *bus.Bus
-	log   *slog.Logger
-	tls   *tls.Config
-	files wellknown.Files
-	sec   a2a.Security // what is mounted; the card is generated from it
-	role  role
-	rpc   http.Handler
-	stop  func() // ends background work and closes the store
+	cfg    config.Config
+	bus    *bus.Bus
+	log    *slog.Logger
+	tls    *tls.Config
+	files  wellknown.Files
+	sec    a2a.Security // what is mounted; the card is generated from it
+	role   role
+	rpc    http.Handler
+	stop   func() // ends background work and closes the store
+	now    func() time.Time
+	agents agentsCache // the dashboard's live verification snapshot (ops only)
 }
 
 func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
@@ -72,6 +74,7 @@ func newAgent(cfg config.Config, log *slog.Logger) (*agent, error) {
 		role:  r,
 		rpc:   a2aServer(cfg, r, log).Handler(),
 		stop:  onceFunc(func() { stop(); r.close() }),
+		now:   time.Now,
 	}, nil
 }
 
@@ -214,6 +217,11 @@ func (a *agent) serve(ctx context.Context, ln net.Listener) error {
 	go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
 	a.publish("agent_started", "ok", "")
 	a.log.Info("listening", "addr", ln.Addr().String())
+	if a.cfg.Role == "ops" {
+		// Only now: ops verifies itself through its own public name, which
+		// routes back to this listener.
+		a.startAgentPoller(ctx)
+	}
 
 	select {
 	case err := <-serveErr:

@@ -32,23 +32,39 @@ else
   fail "node is required for the DOM replay test (acceptance 4) and was not found"
 fi
 
-echo "== 3: axe-core CLI (best-effort: needs Node, a browser and network)"
+# REQUIRE_AXE=1 turns a skip into a failure. A skipped accessibility check is
+# not a passing one, so CI and any release run set it.
+echo "== 3: axe-core CLI, every theme (REQUIRE_AXE=${REQUIRE_AXE:-0})"
+axe_skip() {
+  if [[ ${REQUIRE_AXE:-0} == 1 ]]; then fail "axe could not run and REQUIRE_AXE=1: $*"; fi
+  echo "skipped: $*"
+  return 0
+}
 axe_check() {
-  command -v node >/dev/null 2>&1 || { echo "skipped: node not found"; return 0; }
-  command -v python3 >/dev/null 2>&1 || { echo "skipped: no static server (python3) available"; return 0; }
-  python3 -m http.server 8096 --directory web >/tmp/overpass-axe-srv.log 2>&1 &
+  command -v node >/dev/null 2>&1 || { axe_skip "node not found"; return $?; }
+  # Serve web/ with node itself: python3 is not present everywhere (on Windows
+  # it is often a Store stub), and a skipped audit is not a passing one.
+  node scripts/static-server.js web 8096 >/tmp/overpass-axe-srv.log 2>&1 &
   local srv=$!
   trap 'kill '"$srv"' 2>/dev/null || true' RETURN
   sleep 2
-  local out
-  out=$(npx --yes @axe-core/cli@4 http://127.0.0.1:8096/index.html --exit </dev/null 2>&1) || {
-    echo "skipped: axe could not run (offline or no browser); see docs/status/phase-9.md"; return 0; }
-  if grep -q "0 violations found" <<<"$out"; then
-    echo "ok: axe reports 0 violations"
-  else
-    echo "$out" | grep -iE 'violation|issues detected' >&2
-    fail "axe reported violations"
-  fi
+  # axe ships a chromedriver that must match the installed Chrome. Point
+  # AXE_CHROMEDRIVER at a matching binary when they drift apart.
+  local driver=()
+  [[ -n ${AXE_CHROMEDRIVER:-} ]] && driver=(--chromedriver-path "$AXE_CHROMEDRIVER")
+  # The page reads ?theme= so every theme is audited, not just the default.
+  local theme url out
+  for theme in light dark contrast; do
+    url="http://127.0.0.1:8096/index.html?theme=$theme"
+    out=$(npx --yes @axe-core/cli@4 "$url" ${driver[@]+"${driver[@]}"} --exit </dev/null 2>&1) || {
+      axe_skip "axe could not run: $(tail -3 <<<"$out")"; return $?; }
+    if grep -q "0 violations found" <<<"$out"; then
+      echo "ok: axe reports 0 violations ($theme)"
+    else
+      echo "$out" | grep -iE 'violation|issues detected' >&2
+      fail "axe reported violations in the $theme theme"
+    fi
+  done
 }
 axe_check
 

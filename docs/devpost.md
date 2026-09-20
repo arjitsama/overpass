@@ -60,9 +60,14 @@ exactly why a registered lookalike with no history stays READ_ONLY.
 - The spacecraft and the RF link are **simulated** (no real radio, no real bus); the
   spacecraft has **no public ANS identity** (internal, not registered).
 - **No on-chain settlement**; payment options are described, not executed.
-- Trust observations are **seeded** for the demo (behavior only, marked as seed
-  data); we never fabricate identity or integrity scores.
-- We **run our own trust index**; in production a neutral party would.
+- **No trust index runs in production.** The deployed authority config sets
+  `trust_index.url` to `""`, so the dashboard shows "trust index: not deployed"
+  instead of scores or a tier, and names what actually grants uplink: the
+  authority's operator allow-list (flight rules). Trust observations are seeded
+  (behavior only, marked as seed data) wherever the index *is* run; we never
+  fabricate identity or integrity scores.
+- We **run our own trust index** when it runs at all; in production a neutral
+  party would.
 - Our local identity uses demo-CA (DV) certs, so the index's own FIDUCIARY tier
   isn't reachable locally; Overpass gates on the truthful trust vector in its own
   flight rules instead (see docs/status/phase-8.md).
@@ -73,12 +78,17 @@ Built keyboard-first with a screen reader from the first commit (master plan
 (blue/orange, never red-on-green), two live regions (event log + alerts), an
 announced countdown, three contrast-checked themes, responsive to 360px.
 Automated results: contrast passes for every token pair in all three themes;
-structure checks pass; **axe-core reports 0 violations**. Manual VoiceOver +
-keyboard walkthrough in `docs/a11y-manual.md`.
+structure checks pass; **axe-core reports 0 violations in each of the three
+themes** (`REQUIRE_AXE=1 scripts/accept/phase-9.sh` fails rather than skipping
+when the audit cannot run). Manual VoiceOver + keyboard walkthrough in
+`docs/a11y-manual.md`.
 
 ## Screenshots to attach
 1. Pass schedule table. 2. Impostor rejection (alert region). 3. Session cut
-after revoke. 4. Attack battery results. 5. Five-dimension trust breakdown.
+after revoke. 4. Attack battery results — the last **live** run, with its
+timestamp. 5. Agents and verification: each agent's checks by name, including
+the `card_hash` warning and the DANE outcome, with "trust index: not deployed"
+and the real access basis ("Uplink: operator allow-list (flight rules)").
 
 ## Video
 2-minute walkthrough = the rehearsal screen recording (the demo fallback).

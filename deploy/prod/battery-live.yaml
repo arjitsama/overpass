@@ -1,0 +1,44 @@
+# Attack battery against the PRODUCTION ground station. deploy/install.sh
+# renders ${...} from agents.env into /etc/overpass/battery-live.yaml.
+#
+# Every attack here is one real A2A call the station and spacecraft must refuse:
+# forged and replayed mandates, wrong audience, wrong scope, corrupt signatures.
+# Nothing is written to ANS (registration is a separate, human, permanent step),
+# and the station records only the jti replay entries its own checks need.
+#
+# Run it, record it, and commit the record so the dashboard can show a real run:
+#   battery run -config /etc/overpass/battery-live.yaml -record /etc/overpass/battery-live
+#
+# Only three agents are registered in production (ops, authority, gs-blacksburg),
+# so `ops_wrong` — a *second* registered Ops identity — cannot be supplied.
+# wrong_dpop_key_attack therefore reports INCONCLUSIVE with that reason rather
+# than being counted as blocked. Likewise `other_authority_key_file` is left
+# unset: the battery then signs with a throwaway key the station does not trust,
+# which is what not_owner needs.
+station_url: https://gs-blacksburg.${BASE_DOMAIN}/
+station_ans: ans://v0.1.0.gs-blacksburg.${BASE_DOMAIN}
+station_host: gs-blacksburg.${BASE_DOMAIN}
+# The spacecraft is an internal process with a self-signed cert and no ANS
+# identity; the station and ops chain to the public GoDaddy DV root already in
+# the VPS trust store.
+station_ca: /etc/overpass/certs/spacecraft/server.pem
+spacecraft_url: https://spacecraft.${BASE_DOMAIN}/
+norad_id: 27844
+other_station: ans://v0.1.0.gs-svalbard-eu.${BASE_DOMAIN}
+environments:
+  prod:
+    registry_url: ${REGISTRY_URL}
+    log_url: ${LOG_URL}
+    log_public_url: ${LOG_PUBLIC_URL}
+    root_keys: ["${ANS_ROOT_KEYS}"]
+ops:
+  key_file: /etc/overpass/certs/ops/identity.key
+  chain_file: /etc/overpass/certs/ops/identity.pem
+  ans_name: ans://v0.1.0.ops.${BASE_DOMAIN}
+  agent_id: ${OPS_AGENT_ID}
+  env: prod
+# The authority's own signing key: the battery legitimately holds it to craft
+# validly-signed mandates the station must still refuse on every other check.
+authority_key_file: /etc/overpass/certs/authority/identity.key
+authority_ans: ans://v0.1.0.authority.${BASE_DOMAIN}
+other_authority_ans: ans://v0.1.0.authority.not-ours.invalid

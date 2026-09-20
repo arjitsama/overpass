@@ -1,83 +1,129 @@
 [
   {
+    "kind": "recording",
+    "data": {
+      "recorded_at": "2026-09-20T04:13:47Z",
+      "source": "recorded from the first live uplink pass against production (docs/status/go-live.md)"
+    }
+  },
+  {
     "kind": "pass",
     "data": {
-      "station": "gs-blacksburg.example.com",
+      "station": "gs-blacksburg.blacksburgbytes.club",
       "mode": "downlink",
-      "aos": "20:14:02Z",
-      "los": "20:23:40Z",
+      "aos": "2026-09-20T04:05:12Z",
+      "los": "2026-09-20T04:13:40Z",
       "max_elevation_deg": 61,
-      "tier": "TRANSACTIONAL",
       "status": "booked"
     }
   },
   {
     "kind": "pass",
     "data": {
-      "station": "gs-awarua.example.com",
+      "station": "gs-blacksburg.blacksburgbytes.club",
       "mode": "uplink",
-      "aos": "21:02:10Z",
-      "los": "21:11:55Z",
+      "aos": "2026-09-20T04:13:47Z",
+      "los": "2026-09-20T04:21:47Z",
       "max_elevation_deg": 48,
-      "tier": "FIDUCIARY",
       "status": "booked"
     }
   },
   {
-    "kind": "agent",
+    "kind": "agents",
     "data": {
-      "name": "gs-blacksburg",
-      "verified": true,
-      "integrity": 89,
-      "identity": 40,
-      "solvency": null,
-      "behavior": 100,
-      "safety": null,
-      "tier": "FIDUCIARY",
-      "dane": "Skipped"
-    }
-  },
-  {
-    "kind": "agent",
-    "data": {
-      "name": "gs-svalbard-eu (registered lookalike)",
-      "verified": true,
-      "integrity": 72,
-      "identity": 40,
-      "solvency": null,
-      "behavior": 0,
-      "safety": null,
-      "tier": "READ_ONLY",
-      "dane": "Verified"
+      "checked_at": "2026-09-20T04:13:47Z",
+      "trust_index": "not deployed",
+      "access_basis": "Uplink: operator allow-list (flight rules)",
+      "agents": [
+        {
+          "host": "ops.blacksburgbytes.club",
+          "role": "Mission Ops",
+          "deployed": true,
+          "verified": true,
+          "verdict": "VERIFIED",
+          "dane": "Verified",
+          "checks": [
+            {"name": "registered", "verdict": "pass"},
+            {"name": "badge", "verdict": "pass"},
+            {"name": "scitt_receipt", "verdict": "pass"},
+            {"name": "status_token", "verdict": "pass"},
+            {"name": "cert_chain", "verdict": "pass"},
+            {"name": "tlsa", "verdict": "pass"},
+            {"name": "card_hash", "verdict": "warn", "reason": "card hash: not registered; card bound by signature to log-attested key"},
+            {"name": "card_signature", "verdict": "pass"}
+          ]
+        },
+        {
+          "host": "authority.blacksburgbytes.club",
+          "role": "Authority",
+          "deployed": true,
+          "verified": true,
+          "verdict": "VERIFIED",
+          "dane": "Verified",
+          "checks": [
+            {"name": "registered", "verdict": "pass"},
+            {"name": "badge", "verdict": "pass"},
+            {"name": "scitt_receipt", "verdict": "pass"},
+            {"name": "status_token", "verdict": "pass"},
+            {"name": "cert_chain", "verdict": "pass"},
+            {"name": "tlsa", "verdict": "pass"},
+            {"name": "card_hash", "verdict": "warn", "reason": "card hash: not registered; card bound by signature to log-attested key"},
+            {"name": "card_signature", "verdict": "pass"}
+          ]
+        },
+        {
+          "host": "gs-blacksburg.blacksburgbytes.club",
+          "role": "Ground station",
+          "deployed": true,
+          "verified": true,
+          "verdict": "VERIFIED",
+          "dane": "Verified",
+          "checks": [
+            {"name": "registered", "verdict": "pass"},
+            {"name": "badge", "verdict": "pass"},
+            {"name": "scitt_receipt", "verdict": "pass"},
+            {"name": "status_token", "verdict": "pass"},
+            {"name": "cert_chain", "verdict": "pass"},
+            {"name": "tlsa", "verdict": "pass"},
+            {"name": "card_hash", "verdict": "warn", "reason": "card hash: not registered; card bound by signature to log-attested key"},
+            {"name": "card_signature", "verdict": "pass"}
+          ]
+        },
+        {
+          "host": "gs-sva1bard-eu.blacksburgbytes.club",
+          "role": "Impostor (unregistered)",
+          "deployed": true,
+          "verified": false,
+          "verdict": "FAILED",
+          "reason": "registered: no _ans-badge TXT record: not an ANS agent",
+          "dane": "Unknown",
+          "checks": [
+            {"name": "registered", "verdict": "fail", "reason": "no _ans-badge TXT record: not an ANS agent"},
+            {"name": "badge", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "scitt_receipt", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "status_token", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "cert_chain", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "tlsa", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "card_hash", "verdict": "skip", "reason": "peer is not registered"},
+            {"name": "card_signature", "verdict": "skip", "reason": "peer is not registered"}
+          ]
+        }
+      ]
     }
   },
   {
     "kind": "rejection",
-    "subject": "gs-sva1bard-eu (impostor)",
+    "subject": "gs-sva1bard-eu.blacksburgbytes.club",
     "reason": "not registered in ANS",
     "data": {
-      "agent": "gs-sva1bard-eu (impostor)",
+      "agent": "gs-sva1bard-eu.blacksburgbytes.club",
       "code": "CALLER_REJECTED"
-    }
-  },
-  {
-    "kind": "agent",
-    "data": {
-      "name": "gs-sva1bard-eu (impostor)",
-      "verified": false,
-      "reason": "not registered in ANS",
-      "integrity": null,
-      "identity": null,
-      "solvency": null,
-      "behavior": null,
-      "safety": null,
-      "tier": "\u2014"
     }
   },
   {
     "kind": "active_pass",
     "data": {
-      "station": "gs-blacksburg.example.com",
+      "station": "gs-blacksburg.blacksburgbytes.club",
       "countdown_s": 95,
       "session_state": "active",
       "token_age_s": 12,
@@ -90,7 +136,7 @@
       "name": "replay_booking",
       "verdict": "BLOCKED",
       "observed": "DPOP_REJECTED:replay",
-      "detail": ""
+      "detail": "refused with the expected code"
     }
   },
   {
@@ -104,11 +150,11 @@
   },
   {
     "kind": "session_cut",
-    "subject": "gs-blacksburg.example.com",
-    "reason": "token_revoked",
+    "subject": "gs-blacksburg.blacksburgbytes.club",
+    "reason": "SESSION_CUT:revoked: simulated compromise (test control)",
     "data": {
-      "station": "gs-blacksburg.example.com",
-      "reason": "token_revoked"
+      "station": "gs-blacksburg.blacksburgbytes.club",
+      "reason": "SESSION_CUT:revoked: simulated compromise (test control)"
     }
   }
 ]

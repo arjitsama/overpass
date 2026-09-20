@@ -17,6 +17,11 @@ stream {
         gs-sva1bard-eu.${BASE_DOMAIN} 127.0.0.1:${IMPOSTOR_PORT};
         auditor.${BASE_DOMAIN}        127.0.0.1:${AUDITOR_PORT};
         spacecraft.${BASE_DOMAIN}     127.0.0.1:${SPACECRAFT_PORT};
+        # The bare domain and www are not agents: they hold an ordinary Let's
+        # Encrypt cert and redirect to the dashboard (deploy/nginx-web.conf.template),
+        # so a browser reaches it without an ANS-cert name mismatch.
+        ${BASE_DOMAIN}                127.0.0.1:${WEB_PORT};
+        www.${BASE_DOMAIN}            127.0.0.1:${WEB_PORT};
         default                       127.0.0.1:${OPS_PORT};
     }
 
@@ -25,6 +30,6 @@ stream {
         listen [::]:443;
         ssl_preread on;
         proxy_pass $overpass_upstream;
-        proxy_timeout 10m;   # long-lived /events SSE streams
+        proxy_timeout 1h;    # long-lived /events SSE streams (pinged every 15s)
     }
 }

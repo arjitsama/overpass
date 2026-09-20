@@ -76,6 +76,18 @@ for a in "${AGENTS[@]}"; do
   render "$REPO_DIR/deploy/prod/$src.yaml" "/etc/overpass/$a.yaml"
 done
 
+# 4b. the attack battery's own config (not an agent: it is the red-team tool),
+# plus the records the dashboard reads. The battery record is produced by
+# `battery run -record` and committed; the fraud log is written by hand.
+render "$REPO_DIR/deploy/prod/battery-live.yaml" "/etc/overpass/battery-live.yaml"
+for rec in docs/status/battery-live.json docs/status/fraud-redteam.md; do
+  if [[ -f "$REPO_DIR/$rec" ]]; then
+    run install -m 0644 "$REPO_DIR/$rec" "/etc/overpass/$(basename "$rec")"
+  else
+    say "note: $rec not present; the dashboard will say no live run is recorded"
+  fi
+done
+
 # 5. systemd unit
 run install -m 0644 "$REPO_DIR/deploy/overpass@.service" /etc/systemd/system/overpass@.service
 run systemctl daemon-reload
@@ -84,6 +96,27 @@ run systemctl daemon-reload
 run install -d /etc/nginx/streams-enabled
 render "$REPO_DIR/deploy/nginx-sni.conf.template" "/etc/nginx/streams-enabled/overpass.conf"
 say "note: ensure nginx.conf has 'include /etc/nginx/streams-enabled/*.conf;' at top level (outside http{})"
+
+# 6b. bare domain (apex + www) -> the dashboard, over an ordinary Let's Encrypt
+# certificate. No agent's certificate, DNS record or registration is touched.
+# Before the certificate exists only the port-80 ACME/redirect server can be
+# rendered; once certbot has issued, the full config adds the TLS redirect.
+run install -d /var/www/acme
+WEB_CERT=/etc/letsencrypt/live/${BASE_DOMAIN:-blacksburgbytes.club}/fullchain.pem
+if [[ -f $WEB_CERT ]]; then
+  render "$REPO_DIR/deploy/nginx-web.conf.template" "/etc/nginx/sites-enabled/overpass-web.conf"
+else
+  say "note: $WEB_CERT missing; rendering the port-80 bootstrap only. Then run:"
+  say "  certbot certonly --webroot -w /var/www/acme -d \${BASE_DOMAIN} -d www.\${BASE_DOMAIN} \\"
+  say "    --agree-tos -m <email> -n --deploy-hook 'systemctl reload nginx'"
+  say "  and re-run this script to add the TLS redirect."
+  render "$REPO_DIR/deploy/nginx-web-bootstrap.conf.template" "/etc/nginx/sites-enabled/overpass-web.conf"
+fi
+# The stock default site also answers on :80 and would shadow ours.
+if [[ -e /etc/nginx/sites-enabled/default ]]; then
+  run rm -f /etc/nginx/sites-enabled/default
+fi
+
 run nginx -t
 run systemctl reload nginx
 

@@ -278,6 +278,13 @@ func (b *Battery) wrongScope(ctx context.Context) Result {
 }
 
 func (b *Battery) wrongDPoPKey(ctx context.Context) Result {
+	// This attack needs a *second* registered identity to sign with. Where only
+	// one is registered it cannot run, and says so: an attack that never
+	// reached the target is never evidence that the target blocked it.
+	if b.OpsWrong == nil {
+		return Result{Name: "wrong_dpop_key_attack", Verdict: Inconclusive, Expected: errs.DPoPRejectedKey,
+			Detail: "needs a second registered Ops identity; none is configured"}
+	}
 	q, err := b.FreshQuote(ctx, schema.ModeUplink, time.Hour, 8*time.Minute)
 	if err != nil {
 		return verdict("wrong_dpop_key_attack", errs.DPoPRejectedKey, "", err)

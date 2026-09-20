@@ -52,6 +52,11 @@ body {
   background: var(--bg);
   color: var(--fg);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Words break at word boundaries everywhere. Only the raw-JSON <pre> opts
+     into breaking anywhere; `anywhere` also shrinks min-content width, which is
+     what collapsed table columns to one letter per line. */
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 /* Visible focus everywhere; never removed (§12). */
@@ -95,6 +100,7 @@ a { color: var(--link); }
   background: var(--surface);
 }
 .app-header h1 { margin: 0; font-size: 1.6rem; }
+.header-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .subtitle { margin: 4px 0 0; color: var(--muted); }
 
 main { padding: 20px; max-width: 1100px; margin: 0 auto; }
@@ -158,17 +164,26 @@ button[aria-pressed="true"] {
   gap: 12px;
   margin: 0;
 }
-.active-pass div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.active-pass div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; min-width: 0; }
 .active-pass dt { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
-.active-pass dd { margin: 4px 0 0; font-size: 1.1rem; font-weight: 600; }
+.active-pass dd { margin: 4px 0 0; font-size: 1.1rem; font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+/* A full hostname is longer than the others; it wraps at its dots (<wbr>). */
+.active-pass dd.host { font-size: 1rem; }
 .countdown { font-variant-numeric: tabular-nums; }
 
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-table { border-collapse: collapse; width: 100%; min-width: 640px; }
+/* Tables scroll inside their labelled container rather than squeezing columns;
+   each sets the width below which scrolling begins. */
+table { border-collapse: collapse; width: 100%; min-width: 0; }
+.t-schedule { min-width: 640px; }
+.t-agents { min-width: 620px; }
+.t-battery { min-width: 520px; }
+td.nowrap, th.nowrap { white-space: nowrap; }
 caption { text-align: left; padding: 10px 12px; color: var(--muted); }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
 thead th { background: var(--surface); border-bottom: 2px solid var(--border); }
@@ -180,15 +195,35 @@ tbody tr:last-child td { border-bottom: 0; }
 .status svg { flex: none; }
 .status.ok { color: var(--accent-pass); }
 .status.bad { color: var(--accent-fail); }
+.status.warn { color: var(--accent-fail); }
 .status.pending { color: var(--muted); }
 .status .label { color: var(--fg); }
 
-.meter-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-meter { width: 90px; height: 14px; }
-.no-signal { color: var(--muted); font-style: italic; }
-
-.timeline { margin-top: 12px; height: 8px; border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent-pass), var(--surface)); }
+/* One chip per verification check: the name is always visible, so a softened
+   check (card_hash: Warn) can never read as a bare pass. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.chip.pass { border-color: var(--accent-pass); }
+.chip.warn, .chip.fail { border-color: var(--accent-fail); }
+.chip .k { color: var(--muted); }
+.tag.recorded {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
 
 #event-log {
   border: 1px solid var(--border);
@@ -202,28 +237,42 @@ meter { width: 90px; height: 14px; }
 #event-log .log-line { padding: 3px 0; border-bottom: 1px solid var(--border); }
 #event-log .log-line:last-child { border-bottom: 0; }
 
-#alert-region {
-  position: sticky;
-  bottom: 0;
-  margin-top: 16px;
-  padding: 0 20px calc(env(safe-area-inset-bottom, 0px));
-}
+/* Session cuts and rejections only. Styled like the rest of the page: a card,
+   not raw text pinned to the bottom of the document. */
+#alert-region { margin: 0 0 16px; }
 #alert-region:not(:empty) {
-  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  padding: 12px 16px;
   background: var(--surface);
-  border-top: 3px solid var(--accent-fail);
+  border: 2px solid var(--accent-fail);
+  border-radius: 8px;
   color: var(--fg);
   font-weight: 600;
 }
+#alert-region p { margin: 0 0 8px; }
+#alert-region p:last-of-type { margin-bottom: 0; }
+#alert-region .dismiss { margin-top: 10px; font-weight: 600; }
+
+/* Connection state: one small pill in the header, announced once per change. */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.live-pill.ok { border-color: var(--accent-pass); }
 
 /* GoDaddy's agent verdict card. Rows are icon + text + value; the raw JSON is
    collapsed and scrolls inside its own box so the page never grows sideways. */
 .verify-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-.verify-card h3 { margin: 0 0 10px; font-size: 1.05rem; overflow-wrap: anywhere; }
+.verify-card h3 { margin: 0 0 10px; font-size: 1.05rem; overflow-wrap: break-word; }
 .verify-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; margin: 0; }
 .verify-rows div { min-width: 0; }
 .verify-rows dt { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
-.verify-rows dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.verify-rows dd { margin: 2px 0 0; overflow-wrap: break-word; }
 .verify-card details { margin-top: 10px; }
 .verify-card summary { cursor: pointer; }
 .raw-scroll { overflow-x: auto; max-height: 40vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
@@ -232,7 +281,10 @@ meter { width: 90px; height: 14px; }
 /* Nothing may push the page wider than the viewport (audited at 360px). */
 html, body { max-width: 100%; overflow-x: hidden; }
 main > section, .controls, .active-pass { min-width: 0; }
-#event-log .log-line, .field-error, .alert-region p, td, th { overflow-wrap: anywhere; }
+main > section > * { min-width: 0; }
+/* break-word, not anywhere: a long token may break, but ordinary words and
+   table headings keep their min-content width. */
+#event-log .log-line, .field-error, #alert-region p { overflow-wrap: break-word; }
 
 @media (max-width: 700px) {
   main { padding: 16px; }

@@ -19,6 +19,23 @@ card:
 ui:
   webmesh_url: https://agent.webmesh.ai/mcp
   verify_host: gs-blacksburg.${BASE_DOMAIN}
+  # No trust index runs in production (authority-tonight.yaml sets trust_index.url
+  # to ""), so the dashboard says so instead of showing scores or a tier, and
+  # states what actually grants uplink.
+  trust_index_note: not deployed
+  access_basis: "Uplink: operator allow-list (flight rules)"
+  refresh_every: 10m
+  battery_live_file: /etc/overpass/battery-live.json
+  fraud_redteam_file: /etc/overpass/fraud-redteam.md
+  # Verified live on every refresh, in this order. Agents that are registered
+  # but not running are listed as "not deployed" and never contacted.
+  agents:
+    - {host: ops.${BASE_DOMAIN}, role: Mission Ops}
+    - {host: authority.${BASE_DOMAIN}, role: Authority}
+    - {host: gs-blacksburg.${BASE_DOMAIN}, role: Ground station}
+    - {host: gs-sva1bard-eu.${BASE_DOMAIN}, role: Impostor (unregistered)}
+    - {host: gs-awarua.${BASE_DOMAIN}, role: Ground station, deployed: false}
+    - {host: gs-svalbard-eu.${BASE_DOMAIN}, role: Ground station, deployed: false}
 peers:
   - {name: authority, url: https://authority.${BASE_DOMAIN}}
   - {name: gs-blacksburg, url: https://gs-blacksburg.${BASE_DOMAIN}}

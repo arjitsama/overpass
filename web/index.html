@@ -14,9 +14,13 @@
       <p class="subtitle">Satellite <strong id="sat-name">AO-73 (FUNcube-1)</strong>,
         NORAD ID <strong id="norad-id">39444</strong></p>
     </div>
-    <button id="contrast-toggle" type="button" aria-pressed="false">
-      High-contrast mode
-    </button>
+    <div class="header-controls">
+      <!-- Connection state lives here and only here, announced once per change. -->
+      <span id="live-status" class="live-pill pending" role="status" aria-live="polite"></span>
+      <button id="contrast-toggle" type="button" aria-pressed="false">
+        High-contrast mode
+      </button>
+    </div>
   </header>
 
   <main>
@@ -50,12 +54,13 @@
       </button>
       <span id="compromise-note" class="muted">Cuts the active session and re-plans. Repeatable and
         resettable; a simulation, not a real ANS revocation.</span>
+      <span id="compromise-err" class="field-error" hidden></span>
     </div>
 
     <section aria-labelledby="active-h">
       <h2 id="active-h">Active pass</h2>
       <dl class="active-pass">
-        <div><dt>Station</dt><dd id="ap-station">—</dd></div>
+        <div><dt>Station</dt><dd id="ap-station" class="host">—</dd></div>
         <div><dt>Countdown</dt>
           <dd>
             <span id="ap-countdown" class="countdown" aria-hidden="true">--:--</span>
@@ -71,8 +76,8 @@
     <section id="pass-schedule" tabindex="-1" aria-labelledby="schedule-h">
       <h2 id="schedule-h">Pass schedule</h2>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Pass schedule table, scrollable">
-        <table id="schedule-table">
-          <caption>Upcoming passes, from public orbit data. The timeline graphic below adds nothing this table lacks.</caption>
+        <table id="schedule-table" class="t-schedule">
+          <caption>Upcoming passes, from public orbit data.</caption>
           <thead>
             <tr>
               <th scope="col">Station</th>
@@ -80,38 +85,41 @@
               <th scope="col">Acquisition (AOS)</th>
               <th scope="col">Loss (LOS)</th>
               <th scope="col">Max elevation</th>
-              <th scope="col">Tier</th>
               <th scope="col">Status</th>
             </tr>
           </thead>
           <tbody id="schedule-body">
-            <tr class="empty-row"><td colspan="7">No passes yet.</td></tr>
+            <tr class="empty-row"><td colspan="6">No passes yet.</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="timeline" aria-hidden="true" id="timeline"></div>
     </section>
 
     <section aria-labelledby="agents-h">
       <h2 id="agents-h">Agents and trust</h2>
-      <p id="agents-note">Identity is not trust. A station may pass every identity check and still lack the audited history an uplink needs.</p>
+      <p>Identity is not trust. Every check below is an identity check: a station may pass
+        all of them and still lack the audited history an uplink needs.</p>
+      <p id="agents-note">Trust index: not deployed. Uplink: operator allow-list (flight rules).</p>
+      <div class="controls" role="group" aria-label="Agent verification controls">
+        <button id="btn-refresh-agents" type="button" aria-describedby="agents-checked agents-err">Re-check agents now</button>
+        <span id="agents-checked" class="muted">Not checked yet.</span>
+        <span id="agents-err" class="field-error" hidden></span>
+      </div>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Agents and trust table, scrollable">
-        <table id="agents-table">
-          <caption>Each agent's verification checks and five trust dimensions.</caption>
+        <table id="agents-table" class="t-agents">
+          <caption>Live verification of each agent, from the same checks as
+            <code>bin/agent --verify</code>. No trust index runs in production, so no scores are shown.</caption>
           <thead>
             <tr>
               <th scope="col">Agent</th>
+              <th scope="col">Role</th>
               <th scope="col">Verification</th>
-              <th scope="col">Integrity</th>
-              <th scope="col">Identity</th>
-              <th scope="col">Solvency</th>
-              <th scope="col">Behavior</th>
-              <th scope="col">Safety</th>
-              <th scope="col">Tier</th>
+              <th scope="col">DANE</th>
+              <th scope="col">Checks</th>
             </tr>
           </thead>
           <tbody id="agents-body">
-            <tr class="empty-row"><td colspan="8">No agents yet.</td></tr>
+            <tr class="empty-row"><td colspan="5">No agents checked yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -119,16 +127,11 @@
 
     <section aria-labelledby="battery-h">
       <h2 id="battery-h">Attack battery</h2>
-      <div class="controls recorded-controls" role="group" aria-label="Recorded battery replay">
-        <span class="test-badge">Recorded replay</span>
-        <button id="btn-battery" type="button" aria-describedby="battery-note battery-err">Run battery (recorded)</button>
-        <span id="battery-note" class="muted">Replays recorded battery results — a live run is <code>bin/battery</code>.</span>
-        <span id="battery-err" class="field-error" hidden></span>
-      </div>
-      <h3 id="battery-results-h" tabindex="-1">Results</h3>
-      <div class="table-scroll" tabindex="0" role="region" aria-label="Battery results table, scrollable">
-        <table id="battery-table">
-          <caption>Each attack and the verdict the target returned.</caption>
+      <h3 id="battery-results-h" tabindex="-1">Last live run</h3>
+      <p id="battery-live-summary" class="muted">No live run recorded yet.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Live battery results table, scrollable">
+        <table id="battery-table" class="t-battery">
+          <caption>Each attack of the last live run against production, and the verdict the target returned.</caption>
           <thead>
             <tr>
               <th scope="col">Attack</th>
@@ -138,21 +141,50 @@
             </tr>
           </thead>
           <tbody id="battery-body">
-            <tr class="empty-row"><td colspan="4">Battery not run yet.</td></tr>
+            <tr class="empty-row"><td colspan="4">No live run recorded yet.</td></tr>
           </tbody>
         </table>
       </div>
+
+      <div class="controls recorded-controls" role="group" aria-label="Recorded battery replay">
+        <span class="test-badge">Recorded replay</span>
+        <button id="btn-battery" type="button" aria-describedby="battery-note battery-err">Run battery (recorded)</button>
+        <span id="battery-note" class="muted">Fallback only: replays recorded battery results — a live run is <code>bin/battery</code>.</span>
+        <span id="battery-err" class="field-error" hidden></span>
+      </div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Recorded battery results table, scrollable">
+        <table id="battery-recorded-table" class="t-battery">
+          <caption>Recorded battery replay. These rows are recorded, not a live run.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Attack</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Observed code</th>
+              <th scope="col">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="battery-recorded-body">
+            <tr class="empty-row"><td colspan="4">Recorded battery not replayed yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="fraud-line" class="muted">GoDaddy's fraud agent: no results recorded.</p>
     </section>
 
     <section aria-labelledby="log-h">
       <h2 id="log-h">Event log</h2>
       <div id="event-log" role="log" aria-live="polite" aria-label="Event log"></div>
     </section>
+
+    <section aria-labelledby="alerts-h">
+      <h2 id="alerts-h">Alerts</h2>
+      <!-- Session cuts and rejections only. Never connection state. -->
+      <div id="alert-region" role="alert" aria-live="assertive"></div>
+      <button id="alert-dismiss" type="button" class="dismiss" hidden>Dismiss alerts</button>
+    </section>
   </main>
 
-  <!-- Alert region for session cuts and rejections. Created empty at load. -->
-  <div id="alert-region" role="alert" aria-live="assertive"></div>
-
+  <script src="live.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

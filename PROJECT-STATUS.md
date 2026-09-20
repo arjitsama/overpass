@@ -122,11 +122,23 @@ and to match the real external APIs read at build time, per hard rule 9):
   (The external supplier at supplier.webmesh.ai does require EIP-3009 on Base
   Sepolia for a *valid* booking; we would answer `PAYMENT_REQUIRED` — see
   docs/webmesh-interop.md.)
-- Trust observations are **seeded** for the demo (behavior only, marked as seed
-  data). Identity and integrity scores are never fabricated.
-- We **run our own trust index and auditor**; in production a neutral party would.
+- **No trust index runs in production.** `deploy/prod/authority-tonight.yaml`
+  sets `trust_index.url: ""`, so the dashboard shows "trust index: not deployed"
+  in place of scores and names the real gate: *Uplink: operator allow-list
+  (flight rules)*. It never shows a tier for an agent it has no index for.
+- Trust observations are **seeded** wherever the index does run (behavior only,
+  marked as seed data). Identity and integrity scores are never fabricated.
+- We **run our own trust index and auditor** when they run at all; in production
+  a neutral party would.
 - Local identity uses demo-CA (DV) certs, so the index's own FIDUCIARY tier isn't
   reachable locally; Overpass gates on the truthful vector instead.
+- The dashboard's **agents table is live**: each row is a real `VerifyPeer` run
+  (the same checks as `bin/agent --verify`), refreshed every 10 minutes and on
+  demand, with every check and the DANE outcome shown by name. The
+  **attack-battery card shows the last live run** recorded by
+  `battery run -record` (`docs/status/battery-live.json`) with its timestamp;
+  the recorded replay is a labelled fallback and every row it draws carries a
+  "Recorded &lt;date&gt;" tag.
 
 ## Stubbed / deferred (consolidated from the phase status docs)
 

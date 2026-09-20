@@ -19,6 +19,7 @@ func TestHandlerServesAssets(t *testing.T) {
 		{"/ui/", "text/html; charset=utf-8", "<h1>Overpass</h1>"},
 		{"/ui/index.html", "text/html; charset=utf-8", "Skip to pass schedule"},
 		{"/ui/app.js", "text/javascript; charset=utf-8", "applyEvent"},
+		{"/ui/live.js", "text/javascript; charset=utf-8", "connectEvents"},
 		{"/ui/styles.css", "text/css; charset=utf-8", "--accent-pass"},
 	}
 	for _, c := range cases {

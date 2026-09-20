@@ -8,6 +8,7 @@
 //	battery <name>  -config battery.yaml            # one named attack
 //	battery canary  -config battery.yaml            # the two auditor probes
 //	battery run     -config battery.yaml -expect-vulnerable   # a rogue target: do not gate
+//	battery run     -config battery.yaml -record docs/status/battery-live  # write .json + .md
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 	"io"
 	"os"
 	"text/tabwriter"
+	"time"
 
 	"github.com/arjitsama/overpass/internal/battery"
 )
@@ -42,13 +44,14 @@ func run(ctx context.Context, args []string, out io.Writer) (int, error) {
 	cfgPath := fs.String("config", "", "battery config file (required)")
 	asJSON := fs.Bool("json", false, "JSON output")
 	expectVuln := fs.Bool("expect-vulnerable", false, "the target is expected to be vulnerable (rogue); do not gate")
+	record := fs.String("record", "", "write <base>.json and <base>.md: the dated record of this live run")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2, err
 	}
 	if *cfgPath == "" {
 		return 2, fmt.Errorf("-config is required")
 	}
-	b, closeFn, err := load(ctx, *cfgPath)
+	b, target, closeFn, err := load(ctx, *cfgPath)
 	if err != nil {
 		return 2, err
 	}
@@ -68,6 +71,11 @@ func run(ctx context.Context, args []string, out io.Writer) (int, error) {
 		results = []battery.Result{r}
 	}
 
+	if *record != "" {
+		if err := writeRecord(*record, target, results, time.Now()); err != nil {
+			return 2, err
+		}
+	}
 	if *asJSON {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")

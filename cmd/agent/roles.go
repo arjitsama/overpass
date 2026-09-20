@@ -29,6 +29,9 @@ type role struct {
 	handlers map[string]a2a.Handler
 	close    func()
 	disabled []string // skills switched off for want of config: pruned from the card
+	// peers verifies other agents. Ops keeps one for the dashboard's live
+	// agent feed; the authority keeps one to gate mandates.
+	peers *verify.Verifier
 }
 
 // pruneSkills drops disabled skills from the card, so it never lists a
@@ -63,6 +66,18 @@ func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b 
 	}
 	if cfg.Role == "auditor" {
 		return auditorRole(cfg, id, b, log, r)
+	}
+	if cfg.Role == "ops" {
+		// Ops serves the dashboard, which shows live VerifyPeer results for
+		// every agent it lists. Each check emits a bus event, so the event log
+		// shows the verification as it happens.
+		v, err := verify.New(cfg, verify.Options{Self: cfg.Host,
+			Emit: func(e bus.Event) { _, _ = b.Publish(e) }, Log: log})
+		if err != nil {
+			return r, err
+		}
+		r.peers = v
+		return r, nil
 	}
 	if cfg.Role != "station" && cfg.Role != "authority" {
 		return r, nil
@@ -99,6 +114,7 @@ func buildRole(ctx context.Context, cfg config.Config, id wellknown.Identity, b 
 		r.close()
 		return r, err
 	}
+	r.peers = v
 	au := &authority.Authority{ANSName: wellknown.ANSName(cfg), Key: id.Key, Rules: cfg.FlightRules, Ops: cfg.OpsAgents,
 		Peers: v, Trust: trustSource(cfg), Store: db, Caller: station.PopCaller,
 		Emit: emit, Now: time.Now, Log: log}

@@ -10,11 +10,15 @@ import (
 	"github.com/arjitsama/overpass/internal/errs"
 )
 
-const (
+// Vars, not consts, so the tests can shorten them.
+var (
 	// heartbeat keeps idle connections open through proxies.
 	heartbeat = 15 * time.Second
 	// writeWait bounds each write so a stalled client cannot pin a handler
-	// (and its subscriber slot) or hold up shutdown.
+	// (and its subscriber slot) or hold up shutdown. It is armed immediately
+	// before each write: arming it before the select below would let an idle
+	// stream burn the whole budget waiting for the heartbeat tick, so the ping
+	// would then fail with a deadline error and drop the connection.
 	writeWait = 10 * time.Second
 )
 
@@ -69,7 +73,6 @@ func (b *Bus) stream(w http.ResponseWriter, r *http.Request, rc *http.ResponseCo
 	defer tick.Stop()
 	for {
 		var err error
-		_ = rc.SetWriteDeadline(time.Now().Add(writeWait))
 		select {
 		case <-r.Context().Done():
 			return
@@ -77,8 +80,10 @@ func (b *Bus) stream(w http.ResponseWriter, r *http.Request, rc *http.ResponseCo
 			if !ok {
 				return
 			}
+			_ = rc.SetWriteDeadline(time.Now().Add(writeWait))
 			err = writeEvent(w, e)
 		case <-tick.C:
+			_ = rc.SetWriteDeadline(time.Now().Add(writeWait))
 			_, err = fmt.Fprint(w, ": ping\n\n")
 		}
 		if err != nil || rc.Flush() != nil {

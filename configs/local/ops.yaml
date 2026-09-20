@@ -7,6 +7,11 @@ port: 8443
 peers:
   - name: gs-blacksburg
     url: https://localhost:8444
+ui:
+  trust_index_note: not deployed
+  access_basis: "Uplink: operator allow-list (flight rules)"
+  agents:
+    - {host: gs-blacksburg, role: Ground station}
 card:
   version: 0.1.0
   display_name: Overpass Mission Ops
