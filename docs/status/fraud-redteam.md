@@ -83,3 +83,8 @@ for a fully valid booking (no EIP-3009 settlement, no ticket: Honest limits).
   USDC >= total. We do not have one. Five of six attempts used; the sixth is
   reserved for a funded address if one is supplied. Mandate wire format still
   unobserved (Step 3f not reached). opsflow -demo re-run: PASS.
+- 05:20 **Step 6.1** card_drift_watch with the apex opt-in in place and
+  target_url = our card URL: still `INCONCLUSIVE "target_ans not in
+  FRAUD_TARGET_ALLOWLIST"`; no Retry-After or rate-limit headers on the
+  response. This tool reads only their env allowlist; the DNS opt-in (apex and
+  per-host, both live) does not satisfy it. Needs Scott.
