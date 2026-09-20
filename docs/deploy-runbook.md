@@ -25,7 +25,18 @@ Hosts (all `.blacksburgbytes.club`): `ops`, `authority`, `gs-blacksburg`,
    (custom record types). If it cannot serve TLSA/SVCB or sign the zone, the
    documented fallback is badge + SCITT receipt + cert-fingerprint only — record
    that outcome truthfully in the UI, don't hide it.
-4. In your shell for the registration steps:
+4. **Porkbun specifics (do these first, they trip people up):**
+   - **Delete the default parking records** before adding your own: the `ALIAS`
+     on the root (`@`) and the `CNAME` on `*`, both pointing at
+     `pixie.porkbun.com`. Leaving the wildcard `CNAME` will shadow your host A
+     records.
+   - Enable **Porkbun DNSSEC early** (Details → DNSSEC) — propagation takes time,
+     so do it before you need DANE to count.
+   - In the Porkbun **Host** field enter only the label **before** the base domain
+     (e.g. `ops`, `_ans.ops`, `_443._tcp.gs-blacksburg`), not the full FQDN.
+   - Use **TTL 600** while iterating so corrections propagate fast.
+   - After H4, add a wildcard/`A` record per host pointing at the VPS IP (see H4).
+5. In your shell for the registration steps:
    ```sh
    export ANS_API_KEY=…                     # GoDaddy ANS key (H-gate; from the workshop)
    export ANS_BASE_URL=https://api.godaddy.com
@@ -33,6 +44,22 @@ Hosts (all `.blacksburgbytes.club`): `ops`, `authority`, `gs-blacksburg`,
    (ANS registry is at GoDaddy; DNS is at Porkbun — independent systems.)
 
 ## H2 — Register each agent on ANS (PERMANENT)
+
+**Who gets registered.** Register these eight, in stages. The **spacecraft is
+NOT registered** (it is an internal simulated process with no public ANS
+identity), and **`gs-sva1bard-eu` is NEVER registered** (it is the unregistered
+impostor for the refusal beat — A record + self-signed cert only).
+
+Stage the work so the demo is runnable as early as possible:
+- **Stage 1 — `ops`, `gs-blacksburg`.** Register both, then prove they verify each
+  other and complete a booking (H4 smoke + `bin/opsflow`). Get this working first.
+- **Stage 2 — `authority`, `gs-svalbard-eu`.** Now the authority signs mandates and
+  the registered lookalike shows READ_ONLY. **The system runs and demos correctly
+  with only Stage 1 + Stage 2.**
+- **Stage 3 (nice-to-have) — `auditor`, `gs-rogue`, `gs-awarua`, `gs-spare`.** Adds
+  the auditor/canary, the rogue tier-drop, more schedule options, and the spare
+  station that the one optional real revoke (H6) targets.
+
 Do one host, one step at a time. `scripts/register.sh` is **dry-run by default**;
 real writes need `--i-am-a-human-and-this-is-permanent`.
 1. Freeze the card, then write it to compute its hash:
@@ -55,8 +82,9 @@ real writes need `--i-am-a-human-and-this-is-permanent`.
 5. Publish the ACME challenge it prints, then `--step verify-acme`.
 6. `--step status`, `--step certs` (fetches identity + server certs into
    `certs/<name>/`), and after H3, `--step verify-dns`.
-7. Repeat for all eight hosts. Record every Agent ID and the log URL in
-   `deploy/agents.env`.
+7. Repeat for the eight registered hosts (Stage 1 → 2 → 3). Record every Agent ID
+   and the log URL in `deploy/agents.env`. Do **not** run register.sh against
+   `spacecraft` or `gs-sva1bard-eu`.
 
 ## H3 — DNS records (Porkbun UI)
 For each registered host:

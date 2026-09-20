@@ -13,6 +13,8 @@ stream {
         gs-awarua.${BASE_DOMAIN}      127.0.0.1:${GS_AWARUA_PORT};
         gs-svalbard-eu.${BASE_DOMAIN} 127.0.0.1:${GS_SVALBARD_PORT};
         gs-rogue.${BASE_DOMAIN}       127.0.0.1:${GS_ROGUE_PORT};
+        gs-spare.${BASE_DOMAIN}       127.0.0.1:${GS_SPARE_PORT};
+        gs-sva1bard-eu.${BASE_DOMAIN} 127.0.0.1:${IMPOSTOR_PORT};
         auditor.${BASE_DOMAIN}        127.0.0.1:${AUDITOR_PORT};
         spacecraft.${BASE_DOMAIN}     127.0.0.1:${SPACECRAFT_PORT};
         default                       127.0.0.1:${OPS_PORT};

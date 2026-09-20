@@ -1,0 +1,22 @@
+# Unregistered impostor (production template). gs-sva1bard-eu is a look-alike of
+# gs-svalbard-eu (digit 1 for the letter l). It is NEVER registered on ANS: it has
+# only an A record and a self-signed cert. The demo's refusal beat points Ops at
+# it; VerifyPeer fails (no badge/receipt) and Ops refuses BEFORE any quote is read
+# — identity is the gate. Do not run scripts/register.sh against this host.
+role: station
+host: gs-sva1bard-eu.${BASE_DOMAIN}
+port: ${IMPOSTOR_PORT}
+public_url: https://gs-sva1bard-eu.${BASE_DOMAIN}
+# Self-signed server cert only — no ANS identity, no registration.
+cert: {cert_file: /etc/overpass/certs/gs-sva1bard-eu/server.pem, key_file: /etc/overpass/certs/gs-sva1bard-eu/server.key}
+db_path: /var/lib/overpass/gs-sva1bard-eu.db
+pricing: {per_minute_cents: 100, pay_to: "0xImpostorWallet", network: base-sepolia, asset: USDC, asset_decimals: 6}
+card:
+  version: 0.1.0
+  display_name: Ground Station Svalbard EU
+  description: Unregistered look-alike used only to demonstrate rejection. Not on ANS.
+  org_name: Overpass
+  signed_file: /etc/overpass/certs/gs-sva1bard-eu/agent-card.json
+  skills:
+    - {id: get_pass_quote, name: Pass quote, tags: [uplink-uhf, downlink-uhf]}
+    - {id: book_pass, name: Book pass, tags: [uplink-uhf, downlink-uhf]}

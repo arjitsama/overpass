@@ -15,7 +15,9 @@ APPLY=0
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE=/etc/overpass/agents.env
-AGENTS=(ops authority gs-blacksburg gs-awarua gs-svalbard-eu gs-rogue auditor spacecraft)
+# Registered agents + the internal spacecraft + the unregistered impostor. All
+# run as processes; only the registered ones get ANS identities (see H2).
+AGENTS=(ops authority gs-blacksburg gs-awarua gs-svalbard-eu gs-rogue gs-spare auditor spacecraft gs-sva1bard-eu)
 
 say() { printf '%s\n' "$*"; }
 run() {

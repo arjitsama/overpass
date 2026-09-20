@@ -16,6 +16,18 @@ Tick an item (`[x]`) when it's done, and note when.
 
 ## Before registering (H2)
 
+- [ ] **Register in stages, and know who is NOT registered.** Register eight
+  agents; the **spacecraft is not registered** (internal simulated process, no
+  public ANS identity) and **`gs-sva1bard-eu` is never registered** (the
+  unregistered impostor for the refusal beat — A record + self-signed cert only).
+  Stage 1: `ops` + `gs-blacksburg` (prove mutual verify + a booking). Stage 2:
+  `authority` + `gs-svalbard-eu` — **the demo runs correctly with only Stage 1+2**.
+  Stage 3: `auditor`, `gs-rogue`, `gs-awarua`, `gs-spare` (the spare is the sole
+  target of the one optional real revoke, H6). Full steps: `docs/deploy-runbook.md`.
+- [ ] **Porkbun DNS first-time setup:** delete the default parking records (`ALIAS`
+  on `@` and `CNAME` on `*` → `pixie.porkbun.com`) before adding host `A` records;
+  enable Porkbun DNSSEC early; the Host field takes only the label before the base
+  domain; use TTL 600 while iterating.
 - [ ] **Freeze each card first (master plan 5A).** Finish skill ids, tags, `payTo` and `securitySchemes`.
   Set `card.signed_file`, run `bin/agent --config <cfg> --write-card <path>`, then register with
   `metaDataHash = SHA256:<hex of that file>`. Any later card change means re-registering. (Phase 2, 3)

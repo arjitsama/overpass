@@ -46,7 +46,7 @@ binary plays every role: `--role ops|authority|station|auditor|spacecraft`.
 
 ## Quick start
 
-Needs Go 1.25+ (the version ans-sdk-go requires), `make`, `curl`, and a C
+Needs Go 1.26+ (matches the vendored trust-index fork), `make`, `curl`, and a C
 toolchain for `go test -race` (Xcode command line tools on macOS).
 
 ```sh
@@ -273,6 +273,7 @@ by design — full step-by-step in `docs/deploy-runbook.md`; the 3-minute demo i
 ## Honest limits
 
 - The **spacecraft and the RF link are simulated** — no real radio, no real bus.
+  The spacecraft is an internal process with **no public ANS identity** (not registered).
 - **No on-chain settlement**; x402 payment options are described, not executed.
 - Trust observations are **seeded** for the demo (behavior only, marked as seed
   data). We never fabricate identity or integrity scores.

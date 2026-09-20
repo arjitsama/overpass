@@ -116,7 +116,12 @@ and to match the real external APIs read at build time, per hard rule 9):
 ## Honest limits
 
 - The **spacecraft and the RF link are simulated** — no real radio, no real bus.
+  The spacecraft is an **internal process with no public ANS identity** (it is not
+  registered on ANS; its security is the Ops signature on each command).
 - **No on-chain settlement**; x402 payment options are described, not executed.
+  (The external supplier at supplier.webmesh.ai does require EIP-3009 on Base
+  Sepolia for a *valid* booking; we would answer `PAYMENT_REQUIRED` — see
+  docs/webmesh-interop.md.)
 - Trust observations are **seeded** for the demo (behavior only, marked as seed
   data). Identity and integrity scores are never fabricated.
 - We **run our own trust index and auditor**; in production a neutral party would.

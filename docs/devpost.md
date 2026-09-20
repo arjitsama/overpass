@@ -57,7 +57,8 @@ availability/probation and earns uplink rights through audited passes — which 
 exactly why a registered lookalike with no history stays READ_ONLY.
 
 ## Honest limits
-- The spacecraft and the RF link are **simulated** (no real radio, no real bus).
+- The spacecraft and the RF link are **simulated** (no real radio, no real bus); the
+  spacecraft has **no public ANS identity** (internal, not registered).
 - **No on-chain settlement**; payment options are described, not executed.
 - Trust observations are **seeded** for the demo (behavior only, marked as seed
   data); we never fabricate identity or integrity scores.

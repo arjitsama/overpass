@@ -53,17 +53,17 @@
   },
   {
     "kind": "rejection",
-    "subject": "gs-sva1bard (impostor)",
+    "subject": "gs-sva1bard-eu (impostor)",
     "reason": "not registered in ANS",
     "data": {
-      "agent": "gs-sva1bard (impostor)",
+      "agent": "gs-sva1bard-eu (impostor)",
       "code": "CALLER_REJECTED"
     }
   },
   {
     "kind": "agent",
     "data": {
-      "name": "gs-sva1bard (impostor)",
+      "name": "gs-sva1bard-eu (impostor)",
       "verified": false,
       "reason": "not registered in ANS",
       "integrity": null,

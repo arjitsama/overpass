@@ -46,7 +46,10 @@ BASE=$1; shift || true
 GATE=0
 [[ "${1:-}" == "--gate" ]] && GATE=1
 MAXT=${SMOKE_MAX_TIME:-4}
-HOSTS=(ops authority gs-blacksburg gs-awarua gs-svalbard-eu gs-rogue auditor spacecraft)
+# Registered agents only. The spacecraft is internal (no public ANS identity) and
+# gs-sva1bard-eu is the unregistered impostor, so neither is expected to verify;
+# they are checked by the demo's refusal beat, not this gate.
+HOSTS=(ops authority gs-blacksburg gs-awarua gs-svalbard-eu gs-rogue gs-spare auditor)
 AGENT=bin/agent
 CARDHASH=bin/cardhash
 # Optional: a config for bin/agent --verify (needs environments + trust roots).
