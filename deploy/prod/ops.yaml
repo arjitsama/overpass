@@ -27,3 +27,7 @@ peers:
   - {name: gs-rogue, url: https://gs-rogue.${BASE_DOMAIN}}
 environments:
   prod: {registry_url: ${REGISTRY_URL}, log_url: ${LOG_URL}, log_public_url: ${LOG_PUBLIC_URL}, root_keys: ["${ANS_ROOT_KEYS}"]}
+# AP2 request signing key (Ed25519) for authority.webmesh.ai request_mandate:
+# the authority fetches the caller's public JWK from this URL. Not in the card.
+well_known_files:
+  - {path: /.well-known/jwks.json, file: /etc/overpass/certs/ops/ap2-jwks.json, content_type: application/json}

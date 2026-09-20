@@ -290,8 +290,9 @@ func TestMCPTransportAndX402Challenge(t *testing.T) {
 	}
 	bad := call(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"book_flight","arguments":{"quote_id":"q","option_id":"o","mandate":"{{{{","dpop_proof":"x"}}}`, nil)
 	br := bad["result"].(map[string]any)
-	if br["isError"] != true || br["structuredContent"].(map[string]any)["code"] != string(errs.MandateParseError) {
-		t.Fatalf("bad mandate %+v", br)
+	txt := br["content"].([]any)[0].(map[string]any)["text"].(string)
+	if br["isError"] != true || br["structuredContent"] != nil || !strings.HasPrefix(txt, "Error executing tool book_flight: MANDATE_PARSE_ERROR: ") {
+		t.Fatalf("bad mandate envelope %+v", br)
 	}
 	garbage := call(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"book_flight","arguments":"not-an-object"}}`, nil)
 	if garbage["result"] == nil && garbage["error"] == nil {

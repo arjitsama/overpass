@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -100,6 +101,24 @@ func (a *agent) routes() http.Handler {
 		})
 		mux.Handle("/mcp/", sa)
 		mux.Handle("/mcp", http.RedirectHandler("/mcp/", http.StatusTemporaryRedirect))
+	}
+	for _, sf := range a.cfg.WellKnownFiles {
+		sf := sf
+		mux.HandleFunc(sf.Path, func(w http.ResponseWriter, r *http.Request) {
+			raw, err := os.ReadFile(sf.File)
+			if err != nil {
+				errs.Write(w, http.StatusNotFound, errs.NotFound, "static file unavailable")
+				return
+			}
+			ct := sf.ContentType
+			if ct == "" {
+				ct = "application/json"
+			}
+			w.Header().Set("Content-Type", ct)
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			_, _ = w.Write(raw)
+		})
 	}
 	mux.HandleFunc("/", a.root)
 	return a.recoverMW(limitBody(mux))

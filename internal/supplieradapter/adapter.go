@@ -147,6 +147,24 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		out, isErr := a.call(r, p.Name, p.Args)
 		a.cfg.Log.Info("mcp_result", "tool", p.Name, "isError", isErr, "result", truncate(mustJSON(out), 600))
+		// Rejections use the envelope captured from supplier.webmesh.ai
+		// (FastMCP tool error): text "Error executing tool <tool>: <CODE>: <detail>",
+		// isError true, no structuredContent. The x402 challenge (get_quote
+		// unpaid) keeps the supplier's structured shape.
+		if rj, ok := out.(map[string]any); ok && isErr {
+			if code, has := rj["code"].(string); has && rj["x402Version"] == nil {
+				family, sub := splitCode(code)
+				detail, _ := rj["detail"].(string)
+				if sub != "" {
+					detail = sub + ": " + detail
+				}
+				a.result(w, req.ID, map[string]any{
+					"content": []map[string]any{{"type": "text", "text": "Error executing tool " + p.Name + ": " + family + ": " + detail}},
+					"isError": true,
+				})
+				return
+			}
+		}
 		text, _ := json.Marshal(out)
 		a.result(w, req.ID, map[string]any{
 			"content":           []map[string]any{{"type": "text", "text": string(text)}},
@@ -220,6 +238,16 @@ func (a *Adapter) call(r *http.Request, name string, args json.RawMessage) (out 
 	default:
 		return reject(errs.NotFound, "unknown tool "+name), true
 	}
+}
+
+// splitCode separates our family code from its sub-reason:
+// "MANDATE_REJECTED:signature" -> ("MANDATE_REJECTED", "signature"). The
+// family is the string their grader matches; the sub-reason stays in detail.
+func splitCode(code string) (string, string) {
+	if i := strings.Index(code, ":"); i > 0 {
+		return code[:i], code[i+1:]
+	}
+	return code, ""
 }
 
 func reject(code errs.Code, detail string) map[string]any {

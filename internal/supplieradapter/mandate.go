@@ -374,6 +374,13 @@ func (a *Adapter) Verify(in bookArgs, r *http.Request) (e *errs.Error) {
 	if err := m.verifySignature(keys); err != nil {
 		return err
 	}
+	// 2b. issuer: the supplier checks the mandate's authority_ans against its
+	// pinned authority before anything else (observed 2026-09-20); so do we.
+	if a.cfg.Authority != "" {
+		if iss := firstNonEmpty(strS(m.Raw["authority_ans"]), strS(m.Raw["issuer"]), strS(m.Raw["iss"])); iss != "" && !strings.EqualFold(iss, a.cfg.Authority) {
+			return errs.New(errs.MandateRejectedUnknownKey, "authority_ans "+iss+" does not match pinned authority "+a.cfg.Authority)
+		}
+	}
 	// 3. audience
 	if !strings.EqualFold(m.Audience, a.cfg.ANSName) && !strings.EqualFold(m.Audience, a.cfg.Host) {
 		return errs.New(errs.MandateRejectedAudience, "mandate audience "+m.Audience+" is not this station ("+a.cfg.ANSName+")")
@@ -445,6 +452,8 @@ func (a *Adapter) Verify(in bookArgs, r *http.Request) (e *errs.Error) {
 	a.used[mid] = now.Add(24 * time.Hour)
 	return nil
 }
+
+func strS(v any) string { s, _ := v.(string); return s }
 
 func (m *Mandate) sigDigest() string {
 	sum := sha256Sum([]byte(m.sig))

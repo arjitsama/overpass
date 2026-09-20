@@ -40,3 +40,24 @@ for a fully valid booking (no EIP-3009 settlement, no ticket: Honest limits).
   payload is the mandate; the first captured request decides which is real.
 - The extension shape payto_binding_check expects for an "attested" payTo.
 - Their paid get_quote response shape (x402 fee not paid).
+
+## Step log (mission 3, 2026-09-20)
+
+- 05:12 **Step 1** apex opt-in: `_fraud-allow.blacksburgbytes.club TXT "v1"`
+  created (per-host already existed); both PASS at 1.1.1.1 and 8.8.8.8.
+- 05:13 **Step 2** supplier rejection envelope captured (two calls, invalid
+  input): HTTP 200, `{"result":{"content":[{"type":"text","text":"Error executing
+  tool book_flight: MANDATE_REJECTED: authority_ans None host does not match
+  pinned authority 'ans://v1.0.2.authority.webmesh.ai'"}],"isError":true}}`; no
+  structuredContent. Both a stripped and a complete-but-bogus mandate hit the
+  same first check: the mandate's `authority_ans` vs a pinned authority (their
+  pin still says v1.0.2 while the authority is v1.0.4). Our book_flight now
+  returns that envelope byte-for-byte (family code + ": " + sub-reason +
+  detail) and checks `authority_ans` against the pinned authority first.
+- 05:16 **Step 3b** get_policy: `{"max_per_trip": 1000.0, "currency": "USD",
+  "allowed_merchants": ["*"], "categories": ["travel"]}` -> our station is an
+  allowed merchant.
+- 05:18 **Step 3a** ops serves `/.well-known/jwks.json` (OKP Ed25519, kid
+  aeVO9iXJuXK_Js9DfLNNOHdjU71PbbtJd9E5sSKp52A, alg EdDSA, use sig) via a new
+  `well_known_files` config; verified with stock curl; ops and station cards
+  unchanged (72f3e657…, b97de46a…). Smoke PASS.

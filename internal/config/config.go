@@ -87,6 +87,13 @@ type Pricing struct {
 	Note           string `yaml:"note"`           // plain-text note carried in the card's x-payment (e.g. "simulated; no settlement is performed")
 }
 
+// StaticFile is one extra file served at Path from File with ContentType.
+type StaticFile struct {
+	Path        string `yaml:"path"`
+	File        string `yaml:"file"`
+	ContentType string `yaml:"content_type"`
+}
+
 // SupplierCfg mounts the supplier-conformance MCP surface (/mcp/) on a
 // station: get_quote (x402-challenged) and book_flight (AP2 mandate + DPoP),
 // verified against the Spending Authority's keys pinned by host. It is a
@@ -259,26 +266,29 @@ type Config struct {
 	Sites     []Site    `yaml:"sites"`
 	Satellite Satellite `yaml:"satellite"`
 
-	DBPath        string                 `yaml:"db_path"`
-	Pricing       Pricing                `yaml:"pricing"`
-	SatReg        SatReg                 `yaml:"satreg"`
-	AuthorityKeys []AuthorityKey         `yaml:"authority_keys"`
-	OpsAgents     []string               `yaml:"ops_agents"`  // ANS names allowed to request mandates
-	TrustTiers    map[string]string      `yaml:"trust_tiers"` // host -> tier; fallback when no trust_index
-	TrustIndex    TrustIndexCfg          `yaml:"trust_index"`
-	FlightRules   FlightRules            `yaml:"flight_rules"`
-	Auditor       AuditorCfg             `yaml:"auditor"`
-	Spacecraft    SpacecraftCfg          `yaml:"spacecraft"`
-	Session       SessionCfg             `yaml:"session"`
-	Supplier      SupplierCfg            `yaml:"supplier"`
-	Rogue         bool                   `yaml:"rogue"`
-	RogueAck      string                 `yaml:"rogue_ack"`
-	TestControls  bool                   `yaml:"test_controls"` // enables the demo-only /control/compromise route
-	Environments  map[string]Environment `yaml:"environments"`
-	TrustRoots    []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
-	RegistryURL   string                 `yaml:"registry_url"`
-	LogURL        string                 `yaml:"log_url"`
-	UI            UICfg                  `yaml:"ui"`
+	DBPath        string            `yaml:"db_path"`
+	Pricing       Pricing           `yaml:"pricing"`
+	SatReg        SatReg            `yaml:"satreg"`
+	AuthorityKeys []AuthorityKey    `yaml:"authority_keys"`
+	OpsAgents     []string          `yaml:"ops_agents"`  // ANS names allowed to request mandates
+	TrustTiers    map[string]string `yaml:"trust_tiers"` // host -> tier; fallback when no trust_index
+	TrustIndex    TrustIndexCfg     `yaml:"trust_index"`
+	FlightRules   FlightRules       `yaml:"flight_rules"`
+	Auditor       AuditorCfg        `yaml:"auditor"`
+	Spacecraft    SpacecraftCfg     `yaml:"spacecraft"`
+	Session       SessionCfg        `yaml:"session"`
+	Supplier      SupplierCfg       `yaml:"supplier"`
+	// WellKnownFiles serves extra static files (e.g. /.well-known/jwks.json for
+	// AP2 request signing) verbatim; they are not part of the signed card.
+	WellKnownFiles []StaticFile           `yaml:"well_known_files"`
+	Rogue          bool                   `yaml:"rogue"`
+	RogueAck       string                 `yaml:"rogue_ack"`
+	TestControls   bool                   `yaml:"test_controls"` // enables the demo-only /control/compromise route
+	Environments   map[string]Environment `yaml:"environments"`
+	TrustRoots     []string               `yaml:"trust_roots"` // C2SP key strings, as served at the log's /root-keys
+	RegistryURL    string                 `yaml:"registry_url"`
+	LogURL         string                 `yaml:"log_url"`
+	UI             UICfg                  `yaml:"ui"`
 }
 
 // UICfg configures the Ops dashboard's three POST routes (master plan §12).
