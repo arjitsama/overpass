@@ -61,3 +61,25 @@ for a fully valid booking (no EIP-3009 settlement, no ticket: Honest limits).
   aeVO9iXJuXK_Js9DfLNNOHdjU71PbbtJd9E5sSKp52A, alg EdDSA, use sig) via a new
   `well_known_files` config; verified with stock curl; ops and station cards
   unchanged (72f3e657…, b97de46a…). Smoke PASS.
+- 05:18-05:22 **Step 3c-e** request_mandate attempts (all with a valid EdDSA
+  request_jws, kid = our jwks kid; the authority never returned
+  REQUEST_NOT_SIGNED / BAD_SIGNATURE / SUBJECT_MISMATCH / IDENTITY_UNVERIFIED,
+  so it fetched and used our jwks):
+  1. flat payload {subject_ans, quote_id, total, currency, merchant_ans,
+     scope_hint, traveler_dpop_jwk, iat, jti} -> `ARGS_MISMATCH: signed args
+     differ on subject_ans`.
+  2. + `sub` claim -> same ARGS_MISMATCH.
+  3. bound arguments nested under `args` (+ flat copy) -> binding accepted;
+     `INSUFFICIENT_FUNDS: balance unreadable (RPC eth_call failed: execution
+     reverted)` (no settlement_addr given).
+  4. + settlement_addr = 0x0000…0000, total 0.01 -> `INSUFFICIENT_FUNDS:
+     balance 0.00 USDC, outstanding 0.00, requested 0.01`.
+  Evidence: the signed payload must carry the bound arguments under `args`;
+  the issuance check (GOVWARE_ISSUANCE_CHECK_ENABLED) reads the USDC balance of
+  `settlement_addr` on Base Sepolia and requires balance >= total. We hold no
+  Base Sepolia USDC, so a positive-amount mandate cannot be minted by us.
+  5. total 0.0 -> `INSUFFICIENT_FUNDS: non-positive amount`.
+  **Blocker:** a real mandate needs a `settlement_addr` holding Base Sepolia
+  USDC >= total. We do not have one. Five of six attempts used; the sixth is
+  reserved for a funded address if one is supplied. Mandate wire format still
+  unobserved (Step 3f not reached). opsflow -demo re-run: PASS.

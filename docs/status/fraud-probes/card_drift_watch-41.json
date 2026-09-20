@@ -1,0 +1,16 @@
+{
+ "jsonrpc": "2.0",
+ "id": 41,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"check\": \"card_drift_watch\", \"threat_row\": \"B1\", \"verdict\": \"INCONCLUSIVE\", \"detail\": \"target_ans not in FRAUD_TARGET_ALLOWLIST: 'ans://v0.1.0.gs-blacksburg.blacksburgbytes.club'\"}"
+   }
+  ],
+  "structuredContent": {
+   "result": "{\"check\": \"card_drift_watch\", \"threat_row\": \"B1\", \"verdict\": \"INCONCLUSIVE\", \"detail\": \"target_ans not in FRAUD_TARGET_ALLOWLIST: 'ans://v0.1.0.gs-blacksburg.blacksburgbytes.club'\"}"
+  },
+  "isError": false
+ }
+}
